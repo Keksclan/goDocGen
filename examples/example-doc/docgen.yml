@@ -1,0 +1,25 @@
+title: "Professional Documentation"
+subtitle: "Generated with DocGen DocBuilder"
+header:
+  text: "E.ON Digital Technology"
+  image: "assets/header.png"
+footer:
+  text: "© 2026 E.ON Digital Technology"
+colors:
+  title: "#C00000"
+  header: "#C00000"
+fonts:
+  zip: "fonts/fonts.zip"
+  regular: "Roboto-Regular.ttf"
+  bold: "Roboto-Bold.ttf"
+  italic: "Roboto-Italic.ttf"
+  mono: "RobotoMono-Regular.ttf"
+font_size: 12
+page_numbers:
+  start_page: 2
+layout:
+  startpage: "center"
+  body: "justify"
+code_theme: "monokai"
+mermaid:
+  renderer: "mmdc"

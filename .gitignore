@@ -1,0 +1,25 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+docgen
+
+# Cache
+.cache/
+.mermaid_cache/
+
+# Build Output
+dist/
+test_docs/dist/
+example_project/dist/
+test_project/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+go.sum

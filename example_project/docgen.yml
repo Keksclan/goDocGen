@@ -1,0 +1,25 @@
+title: "Modern Documentation"
+subtitle: "Generated with DocGen"
+header:
+  text: "Digital Technology"
+footer:
+  text: "© 2026 Digital Technology"
+colors:
+  title: "#4c4f69"
+  header: "#4c4f69"
+fonts:
+  zip: "fonts/fonts.zip"
+  regular: "Arial.ttf"
+  bold: "Arial-Bold.ttf"
+  italic: "Arial-Italic.ttf"
+  mono: "Courier.ttf"
+font_size: 12
+layout:
+  startpage: "center"
+  body: "justify"
+  margins:
+    left: 10
+    right: 10
+    top: 10
+    bottom: 10
+code_theme: "catppuccin-latte"
