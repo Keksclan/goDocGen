@@ -1,7 +1,7 @@
 package code
 
 import (
-	"docgen/internal/util"
+	"godocgen/internal/util"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -138,3 +138,4 @@ func GetSegments(code, lang, theme string) ([]Segment, string, error) {
 
 	return segments, bg, nil
 }
+

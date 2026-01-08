@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"docgen/internal/util"
+	"godocgen/internal/util"
 	"testing"
 )
 
@@ -21,3 +21,4 @@ func TestHashConsistency(t *testing.T) {
 		t.Error("Hashes for different content should be different")
 	}
 }
+

@@ -1,7 +1,7 @@
 package pdf
 
 import (
-	"docgen/internal/blocks"
+	"godocgen/internal/blocks"
 	"fmt"
 )
 
@@ -375,3 +375,4 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	}
 	g.pdf.Ln(5)
 }
+

@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"docgen/internal/config"
+	"godocgen/internal/config"
 	"os"
 	"testing"
 )
@@ -29,8 +29,8 @@ fonts:
 		t.Errorf("Expected title 'Test Doc', got '%s'", cfg.Title)
 	}
 
-	if cfg.Colors.Title != "#C00000" {
-		t.Errorf("Expected default color #C00000, got %s", cfg.Colors.Title)
+	if cfg.Colors.Title != "#1e66f5" {
+		t.Errorf("Expected default color #1e66f5, got %s", cfg.Colors.Title)
 	}
 }
 
@@ -46,3 +46,4 @@ title: ""
 		t.Error("Expected error for missing required fields, got nil")
 	}
 }
+

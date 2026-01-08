@@ -1,6 +1,6 @@
 package blocks
 
-import "docgen/internal/engine/code"
+import "godocgen/internal/engine/code"
 
 type DocBlock interface {
 	IsBlock()
@@ -75,3 +75,4 @@ type TableRow struct {
 }
 
 func (t TableBlock) IsBlock() {}
+

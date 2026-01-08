@@ -1,7 +1,7 @@
 package markdown
 
 import (
-	"docgen/internal/blocks"
+	"godocgen/internal/blocks"
 	"fmt"
 	"strings"
 
@@ -163,3 +163,4 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 	})
 	return segments
 }
+

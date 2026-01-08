@@ -26,15 +26,16 @@ type Footer struct {
 }
 
 type Colors struct {
-	Title      string `yaml:"title"`  // Default #C00000
-	Header     string `yaml:"header"` // Default #C00000
+	Title      string `yaml:"title"`  // Default #1e66f5 (Catppuccin Blue)
+	Header     string `yaml:"header"` // Default #1e66f5
 	Background string `yaml:"background"`
 	Text       string `yaml:"text"`
 	Accent     string `yaml:"accent"`
 }
 
 type Fonts struct {
-	Zip     string `yaml:"zip" validate:"required"`
+	Zip     string `yaml:"zip" validate:"required_without=URL"`
+	URL     string `yaml:"url" validate:"omitempty,url"`
 	Regular string `yaml:"regular" validate:"required"`
 	Bold    string `yaml:"bold"`
 	Italic  string `yaml:"italic"`

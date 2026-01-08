@@ -6,8 +6,8 @@ header:
 footer:
   text: "© 2026 E.ON Digital Technology"
 colors:
-  title: "#C00000"
-  header: "#C00000"
+  title: "#1e66f5"
+  header: "#1e66f5"
 fonts:
   zip: "fonts/fonts.zip"
   regular: "Roboto-Regular.ttf"

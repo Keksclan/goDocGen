@@ -1,13 +1,13 @@
 package engine
 
 import (
-	"docgen/internal/blocks"
-	"docgen/internal/config"
-	"docgen/internal/engine/code"
-	"docgen/internal/engine/fonts"
-	"docgen/internal/engine/markdown"
-	"docgen/internal/engine/mermaid"
-	"docgen/internal/engine/pdf"
+	"godocgen/internal/blocks"
+	"godocgen/internal/config"
+	"godocgen/internal/engine/code"
+	"godocgen/internal/engine/fonts"
+	"godocgen/internal/engine/markdown"
+	"godocgen/internal/engine/mermaid"
+	"godocgen/internal/engine/pdf"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +39,17 @@ func (b *Builder) Build() error {
 	}
 
 	// 2. Extract Fonts
-	fontZip := filepath.Join(b.ProjectDir, cfg.Fonts.Zip)
+	var fontZip string
+	if cfg.Fonts.URL != "" {
+		var err error
+		fontZip, err = fonts.DownloadFonts(cfg.Fonts.URL, b.CacheDir)
+		if err != nil {
+			return fmt.Errorf("could not download fonts: %w", err)
+		}
+	} else {
+		fontZip = filepath.Join(b.ProjectDir, cfg.Fonts.Zip)
+	}
+
 	fontDir, err := fonts.ExtractFonts(fontZip, b.CacheDir)
 	if err != nil {
 		return fmt.Errorf("font error: %w", err)
@@ -134,3 +144,4 @@ func (b *Builder) Build() error {
 	gen := pdf.NewGenerator(cfg, allBlocks, fontDir)
 	return gen.Generate(outputPath)
 }
+

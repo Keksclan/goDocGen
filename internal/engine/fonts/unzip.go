@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"docgen/internal/util"
+	"godocgen/internal/util"
 )
 
 func ExtractFonts(zipPath, cacheDir string) (string, error) {
@@ -66,3 +66,4 @@ func ExtractFonts(zipPath, cacheDir string) (string, error) {
 
 	return targetDir, nil
 }
+

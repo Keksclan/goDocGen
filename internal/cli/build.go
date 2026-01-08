@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"docgen/internal/engine"
+	"godocgen/internal/engine"
 	"fmt"
 	"log"
 
@@ -27,6 +27,7 @@ var buildCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVarP(&projectDir, "project", "p", ".", "Project directory")
 	buildCmd.Flags().StringVarP(&outDir, "out", "o", "./dist", "Output directory")
 	buildCmd.Flags().StringVarP(&configName, "config", "c", "docgen.yml", "Config file name")

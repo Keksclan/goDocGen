@@ -19,6 +19,9 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("error parsing yaml: %w", err)
 	}
 
+	if cfg.Theme == "" {
+		cfg.Theme = "catppuccin-mocha"
+	}
 	applyTheme(cfg)
 	setDefaults(cfg)
 
@@ -38,10 +41,10 @@ func applyTheme(cfg *Config) {
 	switch cfg.Theme {
 	case "catppuccin-latte":
 		if cfg.Colors.Title == "" {
-			cfg.Colors.Title = "#d20f39"
+			cfg.Colors.Title = "#8839ef" // Latte Mauve (statt Red)
 		}
 		if cfg.Colors.Header == "" {
-			cfg.Colors.Header = "#1e66f5"
+			cfg.Colors.Header = "#1e66f5" // Latte Blue
 		}
 		if cfg.Colors.Background == "" {
 			cfg.Colors.Background = "#eff1f5"
@@ -57,10 +60,10 @@ func applyTheme(cfg *Config) {
 		}
 	case "catppuccin-mocha":
 		if cfg.Colors.Title == "" {
-			cfg.Colors.Title = "#f38ba8"
+			cfg.Colors.Title = "#cba6f7" // Mocha Mauve (statt Red)
 		}
 		if cfg.Colors.Header == "" {
-			cfg.Colors.Header = "#89b4fa"
+			cfg.Colors.Header = "#89b4fa" // Mocha Blue
 		}
 		if cfg.Colors.Background == "" {
 			cfg.Colors.Background = "#1e1e2e"
@@ -72,17 +75,17 @@ func applyTheme(cfg *Config) {
 			cfg.Colors.Accent = "#f5c2e7"
 		}
 		if cfg.CodeTheme == "" {
-			cfg.CodeTheme = "monokai"
+			cfg.CodeTheme = "catppuccin-mocha"
 		}
 	}
 }
 
 func setDefaults(cfg *Config) {
 	if cfg.Colors.Title == "" {
-		cfg.Colors.Title = "#C00000"
+		cfg.Colors.Title = "#1e66f5" // Default Blue (statt E.ON Red)
 	}
 	if cfg.Colors.Header == "" {
-		cfg.Colors.Header = "#C00000"
+		cfg.Colors.Header = "#1e66f5" // Default Blue
 	}
 	if cfg.Mermaid.Renderer == "" {
 		cfg.Mermaid.Renderer = "mmdc"

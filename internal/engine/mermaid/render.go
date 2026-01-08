@@ -2,7 +2,7 @@ package mermaid
 
 import (
 	"context"
-	"docgen/internal/util"
+	"godocgen/internal/util"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -110,3 +110,4 @@ func renderWithChrome(content string, outputPath string) error {
 
 	return os.WriteFile(outputPath, buf, 0644)
 }
+

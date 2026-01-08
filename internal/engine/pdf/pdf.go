@@ -1,8 +1,8 @@
 package pdf
 
 import (
-	"docgen/internal/blocks"
-	"docgen/internal/config"
+	"godocgen/internal/blocks"
+	"godocgen/internal/config"
 	"os"
 	"path/filepath"
 
@@ -116,3 +116,4 @@ func (g *Generator) renderAll(isMeasurement bool) {
 		g.renderBlock(block, isMeasurement)
 	}
 }
+

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"docgen/internal/config"
+	"godocgen/internal/config"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -23,5 +23,6 @@ var validateCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(validateCmd)
 	validateCmd.Flags().StringVarP(&projectDir, "project", "p", ".", "Project directory")
 }

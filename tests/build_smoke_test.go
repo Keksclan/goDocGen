@@ -2,7 +2,7 @@ package tests
 
 import (
 	"archive/zip"
-	"docgen/internal/engine"
+	"godocgen/internal/engine"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,3 +49,4 @@ font_size: 11
 		t.Logf("Build failed as expected (no real font): %v", err)
 	}
 }
+
