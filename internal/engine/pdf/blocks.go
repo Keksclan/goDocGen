@@ -26,6 +26,24 @@ func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 	}
 }
 
+func (g *Generator) safeSetFont(family string, style string, size float64) {
+	// Map family+style to our registeredFonts keys
+	key := family
+	if style != "" {
+		key = family + style
+	}
+
+	if g.registeredFonts[key] {
+		g.pdf.SetFont(family, style, size)
+	} else if g.registeredFonts["Main"] {
+		// Fallback to Main Regular if specific style/family missing
+		g.pdf.SetFont("Main", "", size)
+	} else {
+		// Absolute fallback to built-in font
+		g.pdf.SetFont("Arial", style, size)
+	}
+}
+
 func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	// Update heading counts for numbering
 	if h.Level > 0 && h.Level <= len(g.headingCounts) {
@@ -69,7 +87,7 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 		g.pdf.Ln(3)
 	}
 
-	g.pdf.SetFont("Main", "B", size)
+	g.safeSetFont("Main", "B", size)
 	g.checkPageBreak(size + 15)
 	r, green, b := hexToRGB(g.cfg.Colors.Title)
 	g.pdf.SetTextColor(r, green, b)
@@ -91,8 +109,21 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	g.pdf.Ln(3)
 }
 
+func (g *Generator) safeWrite(size float64, text string, family string, style string) {
+	key := family
+	if style != "" {
+		key = family + style
+	}
+
+	if g.registeredFonts[key] {
+		g.pdf.Write(size, text)
+	} else {
+		g.pdf.Write(size, text)
+	}
+}
+
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
-	g.pdf.SetFont("Main", "", g.cfg.FontSize)
+	g.safeSetFont("Main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 
 	for _, seg := range p.Content {
@@ -109,15 +140,15 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 			if g.cfg.Fonts.Mono != "" {
 				fontFamily = "Mono"
 			}
-			g.pdf.SetFont(fontFamily, "I", g.cfg.FontSize)
+			g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
 			g.pdf.SetFillColor(240, 240, 240)
 			if seg.Text != "" {
-				g.pdf.Write(g.cfg.FontSize/2, seg.Text)
+				g.safeWrite(g.cfg.FontSize/2, seg.Text, fontFamily, "I")
 			}
 		} else {
-			g.pdf.SetFont("Main", style, g.cfg.FontSize)
+			g.safeSetFont("Main", style, g.cfg.FontSize)
 			if seg.Text != "" {
-				g.pdf.Write(g.cfg.FontSize/2, seg.Text)
+				g.safeWrite(g.cfg.FontSize/2, seg.Text, "Main", style)
 			}
 		}
 	}
@@ -132,12 +163,12 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 
 	// Language header
 	if c.Language != "" {
-		g.pdf.SetFont("Main", "B", 7)
+		g.safeSetFont("Main", "B", 7)
 		g.pdf.SetTextColor(150, 150, 150)
 		g.pdf.CellFormat(0, 4, c.Language, "", 1, "R", false, 0, "")
 	}
 
-	g.pdf.SetFont(fontFamily, "I", g.cfg.FontSize)
+	g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
 	bgR, bgG, bgB := 245, 245, 245 // Light grey background for container
 	if c.BgColor != "" {
 		r, green, b := hexToRGB(c.BgColor)
@@ -204,13 +235,13 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 
 			if idx == -1 {
 				if text != "" {
-					g.pdf.Write(lineHeight, text)
+					g.safeWrite(lineHeight, text, fontFamily, "I")
 				}
 				break
 			}
 
 			if idx > 0 {
-				g.pdf.Write(lineHeight, text[:idx])
+				g.safeWrite(lineHeight, text[:idx], fontFamily, "I")
 			}
 			g.pdf.Ln(lineHeight)
 			g.pdf.SetX(x + 5)
@@ -375,4 +406,3 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	}
 	g.pdf.Ln(5)
 }
-

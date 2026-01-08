@@ -186,41 +186,45 @@ func (m model) performAction() tea.Cmd {
 
 var (
 	activeTabStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#eff1f5")).
-		Background(lipgloss.Color("#8839ef")). // Catppuccin Latte Mauve
+		Foreground(lipgloss.Color("#11111b")).
+		Background(lipgloss.Color("#cba6f7")).
 		Padding(0, 2).
 		Bold(true).
 		MarginRight(1)
 
 	inactiveTabStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#4c4f69")).
-		Background(lipgloss.Color("#ccd0da")).
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Background(lipgloss.Color("#313244")).
 		Padding(0, 2).
 		MarginRight(1)
 
 	docStyle = lipgloss.NewStyle().Padding(1, 4, 1, 4)
 
 	titleStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#8839ef")). // Catppuccin Latte Mauve
+		Foreground(lipgloss.Color("#cba6f7")).
 		Bold(true).
-		Underline(true).
 		MarginBottom(1)
 
 	infoStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#1e66f5")).
-		Background(lipgloss.Color("#dce0e8")).
-		Padding(0, 1).
+		Foreground(lipgloss.Color("#89b4fa")).
 		Italic(true)
 
 	selectedStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#eff1f5")).
-		Background(lipgloss.Color("#8839ef")).
+		Foreground(lipgloss.Color("#11111b")).
+		Background(lipgloss.Color("#cba6f7")).
 		Padding(0, 1).
 		Bold(true)
 )
 
 func (m model) View() string {
 	var s strings.Builder
+
+	// Banner
+	banner := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cba6f7")).
+		Bold(true).
+		Render("🚀 goDocGen Professional PDF Builder")
+	s.WriteString(banner + "\n\n")
 
 	// Header / Tabs
 	tabs := []string{"📖 Hilfe", "⚙️ Konfiguration", "⚡ Aktionen", "🏗️ Init"}
@@ -234,20 +238,29 @@ func (m model) View() string {
 	}
 	s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...) + "\n\n")
 
-	// Content
+	// Content Box
+	var content string
 	switch m.state {
 	case stateHelp:
-		s.WriteString(m.helpView())
+		content = m.helpView()
 	case stateConfig:
-		s.WriteString(m.configView())
+		content = m.configView()
 	case stateActions:
-		s.WriteString(m.actionsView())
+		content = m.actionsView()
 	case stateInit:
-		s.WriteString(m.initModel.View())
+		content = m.initModel.View()
 	}
 
+	contentStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#45475a")).
+		Padding(1, 2).
+		Width(80)
+
+	s.WriteString(contentStyle.Render(content))
+
 	if m.statusMsg != "" {
-		s.WriteString("\n\n" + infoStyle.Render(m.statusMsg))
+		s.WriteString("\n\n" + infoStyle.Render("ℹ️ "+m.statusMsg))
 	}
 
 	// Footer
@@ -261,17 +274,19 @@ func (m model) helpView() string {
 	s.WriteString(titleStyle.Render("📘 goDocGen - Hilfe & Funktionen"))
 	s.WriteString("\n")
 	s.WriteString("Dieses Tool generiert professionelle PDFs aus Markdown-Dateien.\n\n")
-	s.WriteString("Kernfunktionen:\n")
-	s.WriteString("• Markdown zu PDF: Konvertiert komplexe MD-Strukturen inkl. Tabellen & Listen.\n")
-	s.WriteString("• Mermaid Diagramme: Automatische Einbindung von Diagrammen (Flowcharts, etc.).\n")
-	s.WriteString("• Syntax Highlighting: Schöner Code dank Chroma (Catppuccin Support).\n")
-	s.WriteString("• Custom Fonts: Unterstützung für eigene Schriftarten (lokal .zip oder URL).\n")
-	s.WriteString("• Themes: Vordefinierte Themes (Catppuccin Latte/Mocha) oder eigene Farben.\n")
-	s.WriteString("• TOC: Automatisches Inhaltsverzeichnis basierend auf Überschriften.\n")
+
+	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")).Render
+
+	s.WriteString(accent("• ") + "Markdown zu PDF: Konvertiert komplexe MD-Strukturen inkl. Tabellen & Listen.\n")
+	s.WriteString(accent("• ") + "Mermaid Diagramme: Automatische Einbindung von Diagrammen (Flowcharts, etc.).\n")
+	s.WriteString(accent("• ") + "Syntax Highlighting: Schöner Code dank Chroma (Catppuccin Support).\n")
+	s.WriteString(accent("• ") + "Custom Fonts: Unterstützung für eigene Schriftarten (lokal .zip oder URL).\n")
+	s.WriteString(accent("• ") + "Themes: Vordefinierte Themes (Catppuccin Latte/Mocha) oder eigene Farben.\n")
+	s.WriteString(accent("• ") + "TOC: Automatisches Inhaltsverzeichnis basierend auf Überschriften.\n")
 	s.WriteString("\n")
-	s.WriteString("Nutzung:\n")
-	s.WriteString("1. Konfiguration in 'docgen.yml' anpassen (Titel, Farben, Fonts).\n")
-	s.WriteString("2. Markdown-Inhalte in 'content/' ablegen (sortiert nach Dateinamen).\n")
+	s.WriteString(accent("Nutzung:") + "\n")
+	s.WriteString("1. Konfiguration in 'docgen.yml' anpassen.\n")
+	s.WriteString("2. Markdown-Inhalte in 'content/' ablegen.\n")
 	s.WriteString("3. Assets (Bilder) in 'assets/' ablegen.\n")
 	s.WriteString("4. Generierung via 'Aktionen' Tab starten.\n")
 	return s.String()
@@ -284,16 +299,19 @@ func (m model) configView() string {
 	if m.cfg == nil {
 		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Render("❌ Keine Konfigurationsdatei gefunden oder Fehler beim Laden."))
 	} else {
-		s.WriteString(fmt.Sprintf("  %-15s %s\n", "📝 Titel:", m.cfg.Title))
-		s.WriteString(fmt.Sprintf("  %-15s %s\n", "🎨 Theme:", m.cfg.Theme))
-		s.WriteString(fmt.Sprintf("  %-15s %s\n", "💻 Code-Theme:", m.cfg.CodeTheme))
-		s.WriteString(fmt.Sprintf("  %-15s %s\n", "🔤 Font (Reg):", m.cfg.Fonts.Regular))
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")).Width(18).Render
+		valStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Render
+
+		s.WriteString(keyStyle("📝 Titel:") + valStyle(m.cfg.Title) + "\n")
+		s.WriteString(keyStyle("🎨 Theme:") + valStyle(m.cfg.Theme) + "\n")
+		s.WriteString(keyStyle("💻 Code-Theme:") + valStyle(m.cfg.CodeTheme) + "\n")
+		s.WriteString(keyStyle("🔤 Font (Reg):") + valStyle(m.cfg.Fonts.Regular) + "\n")
 		if m.cfg.Fonts.URL != "" {
-			s.WriteString(fmt.Sprintf("  %-15s %s\n", "🌐 Font URL:", m.cfg.Fonts.URL))
+			s.WriteString(keyStyle("🌐 Font URL:") + valStyle(m.cfg.Fonts.URL) + "\n")
 		} else {
-			s.WriteString(fmt.Sprintf("  %-15s %s\n", "📦 Font Zip:", m.cfg.Fonts.Zip))
+			s.WriteString(keyStyle("📦 Font Zip:") + valStyle(m.cfg.Fonts.Zip) + "\n")
 		}
-		s.WriteString(fmt.Sprintf("  %-15s %.1f\n", "📏 Schriftgröße:", m.cfg.FontSize))
+		s.WriteString(keyStyle("📏 Schriftgröße:") + valStyle(fmt.Sprintf("%.1f", m.cfg.FontSize)) + "\n")
 	}
 	s.WriteString("\n" + infoStyle.Render("💡 Hinweis: Bearbeiten Sie die docgen.yml direkt für dauerhafte Änderungen."))
 	s.WriteString("\n" + infoStyle.Render("⌨️ Drücken Sie ENTER, um zwischen Latte/Mocha zu wechseln."))
@@ -318,4 +336,3 @@ func (m model) actionsView() string {
 
 	return s.String()
 }
-

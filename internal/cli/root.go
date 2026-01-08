@@ -7,8 +7,8 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "docgen",
-	Short: "DocGen is a professional PDF generator from Markdown",
+	Use:   "godocgen",
+	Short: "goDocGen is a professional PDF generator from Markdown",
 	Long: `goDocGen ist ein Werkzeug zur Erzeugung professioneller PDF-Dokumentation.
 Copyright (c) 2026 goDocGen Team. Alle Rechte vorbehalten.
 Der kommerzielle Verkauf dieses Programms ist nicht gestattet.`,

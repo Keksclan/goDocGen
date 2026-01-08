@@ -3,6 +3,7 @@ package pdf
 import (
 	"godocgen/internal/blocks"
 	"godocgen/internal/config"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -10,13 +11,14 @@ import (
 )
 
 type Generator struct {
-	pdf           *gofpdf.Fpdf
-	cfg           *config.Config
-	blocks        []blocks.DocBlock
-	toc           []TOCEntry
-	fontDir       string
-	totalPages    int
-	headingCounts []int
+	pdf             *gofpdf.Fpdf
+	cfg             *config.Config
+	blocks          []blocks.DocBlock
+	toc             []TOCEntry
+	fontDir         string
+	totalPages      int
+	headingCounts   []int
+	registeredFonts map[string]bool
 }
 
 type TOCEntry struct {
@@ -32,43 +34,78 @@ func NewGenerator(cfg *config.Config, blocks []blocks.DocBlock, fontDir string) 
 	pdf.SetMargins(cfg.Layout.Margins.Left, cfg.Layout.Margins.Top, cfg.Layout.Margins.Right)
 	pdf.SetAutoPageBreak(true, cfg.Layout.Margins.Bottom)
 
-	// Register Fonts
-	registerFonts(pdf, cfg, fontDir)
-
-	return &Generator{
-		pdf:           pdf,
-		cfg:           cfg,
-		blocks:        blocks,
-		fontDir:       fontDir,
-		headingCounts: make([]int, 6),
+	g := &Generator{
+		pdf:             pdf,
+		cfg:             cfg,
+		blocks:          blocks,
+		fontDir:         fontDir,
+		headingCounts:   make([]int, 6),
+		registeredFonts: make(map[string]bool),
 	}
+
+	// Register Fonts
+	g.registerFonts(fontDir)
+
+	return g
 }
 
-func registerFonts(pdf *gofpdf.Fpdf, cfg *config.Config, fontDir string) {
-	regularPath := filepath.Join(fontDir, cfg.Fonts.Regular)
+func (g *Generator) registerFonts(fontDir string) {
+	regularPath := filepath.Join(fontDir, g.cfg.Fonts.Regular)
 	if _, err := os.Stat(regularPath); err == nil {
-		pdf.AddUTF8Font("Main", "", regularPath)
+		g.pdf.AddUTF8Font("Main", "", regularPath)
+		g.registeredFonts["Main"] = true
+	} else {
+		fmt.Printf("Warning: Regular font not found at %s.\n", regularPath)
 	}
 
-	if cfg.Fonts.Bold != "" {
-		boldPath := filepath.Join(fontDir, cfg.Fonts.Bold)
+	if g.cfg.Fonts.Bold != "" {
+		boldPath := filepath.Join(fontDir, g.cfg.Fonts.Bold)
 		if _, err := os.Stat(boldPath); err == nil {
-			pdf.AddUTF8Font("Main", "B", boldPath)
+			g.pdf.AddUTF8Font("Main", "B", boldPath)
+			g.registeredFonts["MainB"] = true
+		} else if g.registeredFonts["Main"] {
+			g.pdf.AddUTF8Font("Main", "B", regularPath)
+			g.registeredFonts["MainB"] = true
 		}
 	}
-	if cfg.Fonts.Italic != "" {
-		italicPath := filepath.Join(fontDir, cfg.Fonts.Italic)
+	if g.cfg.Fonts.Italic != "" {
+		italicPath := filepath.Join(fontDir, g.cfg.Fonts.Italic)
 		if _, err := os.Stat(italicPath); err == nil {
-			pdf.AddUTF8Font("Main", "I", italicPath)
+			g.pdf.AddUTF8Font("Main", "I", italicPath)
+			g.registeredFonts["MainI"] = true
+		} else if g.registeredFonts["Main"] {
+			g.pdf.AddUTF8Font("Main", "I", regularPath)
+			g.registeredFonts["MainI"] = true
 		}
 	}
-	if cfg.Fonts.Mono != "" {
-		monoPath := filepath.Join(fontDir, cfg.Fonts.Mono)
+	if g.registeredFonts["MainB"] && g.registeredFonts["MainI"] {
+		boldPath := filepath.Join(fontDir, g.cfg.Fonts.Bold)
+		if _, err := os.Stat(boldPath); err == nil {
+			g.pdf.AddUTF8Font("Main", "BI", boldPath)
+			g.registeredFonts["MainBI"] = true
+		}
+	}
+
+	if g.cfg.Fonts.Mono != "" {
+		monoPath := filepath.Join(fontDir, g.cfg.Fonts.Mono)
 		if _, err := os.Stat(monoPath); err == nil {
-			pdf.AddUTF8Font("Mono", "", monoPath)
-			pdf.AddUTF8Font("Mono", "I", monoPath)
-			pdf.AddUTF8Font("Mono", "B", monoPath)
-			pdf.AddUTF8Font("Mono", "BI", monoPath)
+			g.pdf.AddUTF8Font("Mono", "", monoPath)
+			g.pdf.AddUTF8Font("Mono", "I", monoPath)
+			g.pdf.AddUTF8Font("Mono", "B", monoPath)
+			g.pdf.AddUTF8Font("Mono", "BI", monoPath)
+			g.registeredFonts["Mono"] = true
+			g.registeredFonts["MonoI"] = true
+			g.registeredFonts["MonoB"] = true
+			g.registeredFonts["MonoBI"] = true
+		} else if g.registeredFonts["Main"] {
+			g.pdf.AddUTF8Font("Mono", "", regularPath)
+			g.pdf.AddUTF8Font("Mono", "I", regularPath)
+			g.pdf.AddUTF8Font("Mono", "B", regularPath)
+			g.pdf.AddUTF8Font("Mono", "BI", regularPath)
+			g.registeredFonts["Mono"] = true
+			g.registeredFonts["MonoI"] = true
+			g.registeredFonts["MonoB"] = true
+			g.registeredFonts["MonoBI"] = true
 		}
 	}
 }
@@ -83,7 +120,8 @@ func (g *Generator) Generate(outputPath string) error {
 	g.pdf = gofpdf.New("P", "mm", "A4", "")
 	g.pdf.SetMargins(g.cfg.Layout.Margins.Left, g.cfg.Layout.Margins.Top, g.cfg.Layout.Margins.Right)
 	g.pdf.SetAutoPageBreak(true, g.cfg.Layout.Margins.Bottom)
-	registerFonts(g.pdf, g.cfg, g.fontDir)
+	g.registeredFonts = make(map[string]bool)
+	g.registerFonts(g.fontDir)
 	g.headingCounts = make([]int, 6)
 
 	// Pass 2: Final render
@@ -116,4 +154,3 @@ func (g *Generator) renderAll(isMeasurement bool) {
 		g.renderBlock(block, isMeasurement)
 	}
 }
-
