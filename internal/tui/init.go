@@ -113,6 +113,7 @@ func (m InitModel) finishInit() tea.Cmd {
 		// docgen.yml erstellen
 		configContent := fmt.Sprintf(`title: "Meine Dokumentation"
 subtitle: "Erstellt mit goDocGen"
+author: "Dein Name"
 header:
   text: "Mein Unternehmen"
 footer:
@@ -136,6 +137,12 @@ layout:
     right: 10
     top: 10
     bottom: 10
+gradient:
+  enabled: false
+  start: "#1e1e2e"
+  end: "#89b4fa"
+  orientation: "vertical"
+  global: false
 code_theme: "%s"
 `, titleColor, titleColor, accent, theme)
 

@@ -3,6 +3,7 @@ package config
 type Config struct {
 	Title       string      `yaml:"title" validate:"required"`
 	Subtitle    string      `yaml:"subtitle"`
+	Author      string      `yaml:"author"`
 	Header      Header      `yaml:"header"`
 	Footer      Footer      `yaml:"footer"`
 	Colors      Colors      `yaml:"colors"`
@@ -11,8 +12,17 @@ type Config struct {
 	FontSize    float64     `yaml:"font_size" validate:"required,gt=0"`
 	PageNumbers PageNumbers `yaml:"page_numbers"`
 	Layout      Layout      `yaml:"layout"`
+	Gradient    Gradient    `yaml:"gradient"`
 	CodeTheme   string      `yaml:"code_theme"`
 	Mermaid     Mermaid     `yaml:"mermaid"`
+}
+
+type Gradient struct {
+	Enabled     bool   `yaml:"enabled"`
+	Start       string `yaml:"start"`       // Hex
+	End         string `yaml:"end"`         // Hex
+	Orientation string `yaml:"orientation"` // "vertical" or "horizontal"
+	Global      bool   `yaml:"global"`      // Apply to all pages
 }
 
 type Header struct {

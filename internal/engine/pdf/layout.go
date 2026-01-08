@@ -54,3 +54,32 @@ func (g *Generator) checkPageBreak(h float64) {
 		g.pdf.AddPage()
 	}
 }
+
+func (g *Generator) drawGradient(startColor, endColor string, orientation string) {
+	sr, sg, sb := hexToRGB(startColor)
+	er, eg, eb := hexToRGB(endColor)
+
+	steps := 100
+	if orientation == "horizontal" {
+		w := 210.0 / float64(steps)
+		for i := 0; i < steps; i++ {
+			ratio := float64(i) / float64(steps)
+			currR := int(float64(sr) + ratio*float64(er-sr))
+			currG := int(float64(sg) + ratio*float64(eg-sg))
+			currB := int(float64(sb) + ratio*float64(eb-sb))
+			g.pdf.SetFillColor(currR, currG, currB)
+			g.pdf.Rect(float64(i)*w, 0, w+0.1, 297, "F")
+		}
+	} else {
+		// Vertical (default)
+		h := 297.0 / float64(steps)
+		for i := 0; i < steps; i++ {
+			ratio := float64(i) / float64(steps)
+			currR := int(float64(sr) + ratio*float64(er-sr))
+			currG := int(float64(sg) + ratio*float64(eg-sg))
+			currB := int(float64(sb) + ratio*float64(eb-sb))
+			g.pdf.SetFillColor(currR, currG, currB)
+			g.pdf.Rect(0, float64(i)*h, 210, h+0.1, "F")
+		}
+	}
+}

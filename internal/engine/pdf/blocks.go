@@ -110,16 +110,63 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 }
 
 func (g *Generator) safeWrite(size float64, text string, family string, style string) {
+	if text == "" {
+		return
+	}
+
 	key := family
 	if style != "" {
 		key = family + style
 	}
 
-	if g.registeredFonts[key] {
-		g.pdf.Write(size, text)
-	} else {
-		g.pdf.Write(size, text)
+	// Verify if the current font is really registered and set in gofpdf
+	if !g.registeredFonts[key] {
+		// If the requested font/style combination is not registered, 
+		// we fallback to "Main" Regular which should be the safest UTF-8 font.
+		if g.registeredFonts["Main"] {
+			g.pdf.SetFont("Main", "", g.cfg.FontSize)
+		} else {
+			// Absolute fallback to built-in Arial (non-UTF8)
+			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
+		}
 	}
+
+	// gofpdf's Write can panic if currentFont is nil or invalid.
+	// We wrap it in a recover to prevent the whole app from crashing if a character is still problematic.
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered from gofpdf panic during Write: %v (Text: %s)\n", r, text)
+		}
+	}()
+
+	g.pdf.Write(size, text)
+}
+
+func (g *Generator) safeWriteLinkID(size float64, text string, family string, style string, link int) {
+	if text == "" {
+		return
+	}
+
+	key := family
+	if style != "" {
+		key = family + style
+	}
+
+	if !g.registeredFonts[key] {
+		if g.registeredFonts["Main"] {
+			g.pdf.SetFont("Main", "", g.cfg.FontSize)
+		} else {
+			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
+		}
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered from gofpdf panic during WriteLinkID: %v (Text: %s)\n", r, text)
+		}
+	}()
+
+	g.pdf.WriteLinkID(size, text, link)
 }
 
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
@@ -159,13 +206,6 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	fontFamily := "Main"
 	if g.cfg.Fonts.Mono != "" {
 		fontFamily = "Mono"
-	}
-
-	// Language header
-	if c.Language != "" {
-		g.safeSetFont("Main", "B", 7)
-		g.pdf.SetTextColor(150, 150, 150)
-		g.pdf.CellFormat(0, 4, c.Language, "", 1, "R", false, 0, "")
 	}
 
 	g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
@@ -211,8 +251,18 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	width := 210 - left - right
 
 	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF") // Rounded corners
-	g.pdf.SetX(x + 5)                                           // Padding
-	g.pdf.SetY(y + 5)                                           // Padding
+
+	// Language label (top right inside)
+	if c.Language != "" {
+		g.safeSetFont("Main", "B", 7)
+		g.pdf.SetTextColor(150, 150, 150)
+		labelW := g.pdf.GetStringWidth(c.Language) + 4
+		g.pdf.SetXY(x+width-labelW-2, y+2)
+		g.pdf.CellFormat(labelW, 4, c.Language, "", 0, "R", false, 0, "")
+	}
+
+	g.pdf.SetX(x + 5) // Padding
+	g.pdf.SetY(y + 5) // Padding
 
 	for _, seg := range c.Segments {
 		if seg.Color != "" {

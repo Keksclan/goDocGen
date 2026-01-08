@@ -139,13 +139,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.performAction()
 			}
 			if m.state == stateConfig && m.cfg != nil {
-				// Theme toggle als Beispiel für "settings treffen"
-				if m.cfg.Theme == "catppuccin-latte" {
-					m.cfg.Theme = "catppuccin-mocha"
-				} else {
+				// Theme rotation: Mocha -> Latte -> Frappe -> Macchiato -> Mocha
+				switch m.cfg.Theme {
+				case "catppuccin-mocha":
 					m.cfg.Theme = "catppuccin-latte"
+				case "catppuccin-latte":
+					m.cfg.Theme = "catppuccin-frappe"
+				case "catppuccin-frappe":
+					m.cfg.Theme = "catppuccin-macchiato"
+				case "catppuccin-macchiato":
+					m.cfg.Theme = "catppuccin-mocha"
+				default:
+					m.cfg.Theme = "catppuccin-mocha"
 				}
-				m.statusMsg = fmt.Sprintf("Theme auf %s geändert (nur für diese Sitzung)", m.cfg.Theme)
+				// Reset colors to theme defaults for preview
+				m.cfg.Colors = config.Colors{}
+				config.ApplyTheme(m.cfg)
+				m.statusMsg = fmt.Sprintf("Theme auf %s gewechselt", m.cfg.Theme)
 			}
 		}
 	case actionResultMsg:
@@ -303,8 +313,35 @@ func (m model) configView() string {
 		valStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Render
 
 		s.WriteString(keyStyle("📝 Titel:") + valStyle(m.cfg.Title) + "\n")
-		s.WriteString(keyStyle("🎨 Theme:") + valStyle(m.cfg.Theme) + "\n")
+		if m.cfg.Author != "" {
+			s.WriteString(keyStyle("👤 Autor:") + valStyle(m.cfg.Author) + "\n")
+		}
+		s.WriteString(keyStyle("🎨 Theme:") + valStyle(m.cfg.Theme))
+
+		// Theme Info
+		themeDesc := ""
+		switch m.cfg.Theme {
+		case "catppuccin-latte":
+			themeDesc = " (Hell & Sauber)"
+		case "catppuccin-frappe":
+			themeDesc = " (Pastell & Sanft)"
+		case "catppuccin-macchiato":
+			themeDesc = " (Modern & Ausbalanciert)"
+		case "catppuccin-mocha":
+			themeDesc = " (Dunkel & Kontrastreich)"
+		}
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Render(themeDesc) + "\n")
+
 		s.WriteString(keyStyle("💻 Code-Theme:") + valStyle(m.cfg.CodeTheme) + "\n")
+
+		// Color preview
+		dot := "● "
+		s.WriteString(keyStyle("🌈 Farben:"))
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(m.cfg.Colors.Title)).Render(dot))
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(m.cfg.Colors.Header)).Render(dot))
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(m.cfg.Colors.Accent)).Render(dot))
+		s.WriteString("\n")
+
 		s.WriteString(keyStyle("🔤 Font (Reg):") + valStyle(m.cfg.Fonts.Regular) + "\n")
 		if m.cfg.Fonts.URL != "" {
 			s.WriteString(keyStyle("🌐 Font URL:") + valStyle(m.cfg.Fonts.URL) + "\n")
@@ -312,9 +349,21 @@ func (m model) configView() string {
 			s.WriteString(keyStyle("📦 Font Zip:") + valStyle(m.cfg.Fonts.Zip) + "\n")
 		}
 		s.WriteString(keyStyle("📏 Schriftgröße:") + valStyle(fmt.Sprintf("%.1f", m.cfg.FontSize)) + "\n")
+
+		// Gradient Info
+		if m.cfg.Gradient.Enabled {
+			gradInfo := "An"
+			if m.cfg.Gradient.Global {
+				gradInfo += " (Global)"
+			}
+			s.WriteString(keyStyle("📐 Gradient:") + valStyle(gradInfo))
+			s.WriteString(" " + lipgloss.NewStyle().Foreground(lipgloss.Color(m.cfg.Gradient.Start)).Render(dot))
+			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(m.cfg.Gradient.End)).Render(dot))
+			s.WriteString("\n")
+		}
 	}
 	s.WriteString("\n" + infoStyle.Render("💡 Hinweis: Bearbeiten Sie die docgen.yml direkt für dauerhafte Änderungen."))
-	s.WriteString("\n" + infoStyle.Render("⌨️ Drücken Sie ENTER, um zwischen Latte/Mocha zu wechseln."))
+	s.WriteString("\n" + infoStyle.Render("⌨️ Drücken Sie ENTER, um durch die Themes zu schalten."))
 	return s.String()
 }
 

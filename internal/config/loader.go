@@ -22,7 +22,7 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Theme == "" {
 		cfg.Theme = "catppuccin-mocha"
 	}
-	applyTheme(cfg)
+	ApplyTheme(cfg)
 	setDefaults(cfg)
 
 	validate := validator.New()
@@ -33,7 +33,7 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-func applyTheme(cfg *Config) {
+func ApplyTheme(cfg *Config) {
 	if cfg.Theme == "" {
 		return
 	}
@@ -41,7 +41,7 @@ func applyTheme(cfg *Config) {
 	switch cfg.Theme {
 	case "catppuccin-latte":
 		if cfg.Colors.Title == "" {
-			cfg.Colors.Title = "#8839ef" // Latte Mauve (statt Red)
+			cfg.Colors.Title = "#8839ef" // Latte Mauve
 		}
 		if cfg.Colors.Header == "" {
 			cfg.Colors.Header = "#1e66f5" // Latte Blue
@@ -58,9 +58,47 @@ func applyTheme(cfg *Config) {
 		if cfg.CodeTheme == "" {
 			cfg.CodeTheme = "catppuccin-latte"
 		}
+	case "catppuccin-frappe":
+		if cfg.Colors.Title == "" {
+			cfg.Colors.Title = "#ca9ee6" // Frappe Mauve
+		}
+		if cfg.Colors.Header == "" {
+			cfg.Colors.Header = "#8caaee" // Frappe Blue
+		}
+		if cfg.Colors.Background == "" {
+			cfg.Colors.Background = "#303446"
+		}
+		if cfg.Colors.Text == "" {
+			cfg.Colors.Text = "#c6d0f5"
+		}
+		if cfg.Colors.Accent == "" {
+			cfg.Colors.Accent = "#f4b8e4"
+		}
+		if cfg.CodeTheme == "" {
+			cfg.CodeTheme = "catppuccin-frappe"
+		}
+	case "catppuccin-macchiato":
+		if cfg.Colors.Title == "" {
+			cfg.Colors.Title = "#c6a0f6" // Macchiato Mauve
+		}
+		if cfg.Colors.Header == "" {
+			cfg.Colors.Header = "#8aadf4" // Macchiato Blue
+		}
+		if cfg.Colors.Background == "" {
+			cfg.Colors.Background = "#24273a"
+		}
+		if cfg.Colors.Text == "" {
+			cfg.Colors.Text = "#cad3f5"
+		}
+		if cfg.Colors.Accent == "" {
+			cfg.Colors.Accent = "#f5bde6"
+		}
+		if cfg.CodeTheme == "" {
+			cfg.CodeTheme = "catppuccin-macchiato"
+		}
 	case "catppuccin-mocha":
 		if cfg.Colors.Title == "" {
-			cfg.Colors.Title = "#cba6f7" // Mocha Mauve (statt Red)
+			cfg.Colors.Title = "#cba6f7" // Mocha Mauve
 		}
 		if cfg.Colors.Header == "" {
 			cfg.Colors.Header = "#89b4fa" // Mocha Blue
@@ -107,6 +145,9 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Layout.Margins.Bottom == 0 {
 		cfg.Layout.Margins.Bottom = 10
+	}
+	if cfg.Gradient.Orientation == "" {
+		cfg.Gradient.Orientation = "vertical"
 	}
 	if cfg.FontSize == 0 {
 		cfg.FontSize = 12.0

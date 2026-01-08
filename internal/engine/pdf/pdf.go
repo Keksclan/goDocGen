@@ -1,9 +1,9 @@
 package pdf
 
 import (
+	"fmt"
 	"godocgen/internal/blocks"
 	"godocgen/internal/config"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -80,8 +80,15 @@ func (g *Generator) registerFonts(fontDir string) {
 	}
 	if g.registeredFonts["MainB"] && g.registeredFonts["MainI"] {
 		boldPath := filepath.Join(fontDir, g.cfg.Fonts.Bold)
+		italicPath := filepath.Join(fontDir, g.cfg.Fonts.Italic)
 		if _, err := os.Stat(boldPath); err == nil {
 			g.pdf.AddUTF8Font("Main", "BI", boldPath)
+			g.registeredFonts["MainBI"] = true
+		} else if _, err := os.Stat(italicPath); err == nil {
+			g.pdf.AddUTF8Font("Main", "BI", italicPath)
+			g.registeredFonts["MainBI"] = true
+		} else if g.registeredFonts["Main"] {
+			g.pdf.AddUTF8Font("Main", "BI", regularPath)
 			g.registeredFonts["MainBI"] = true
 		}
 	}

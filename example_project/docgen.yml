@@ -1,5 +1,6 @@
 title: "Modern Documentation"
 subtitle: "Generated with DocGen"
+author: "Max Mustermann"
 header:
   text: "Digital Technology"
 footer:
@@ -22,4 +23,10 @@ layout:
     right: 10
     top: 10
     bottom: 10
-code_theme: "catppuccin-latte"
+gradient:
+  enabled: true
+  start: "#1e1e2e" # Catppuccin Mocha Base
+  end: "#cba6f7"   # Catppuccin Mocha Mauve
+  orientation: "horizontal"
+  global: false
+code_theme: "catppuccin-mocha"
