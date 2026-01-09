@@ -3,6 +3,7 @@ package mermaid
 
 import (
 	"context"
+	"encoding/json"
 	"godocgen/internal/util"
 	"fmt"
 	"os"
@@ -60,34 +61,44 @@ func renderWithMmdc(content string, svgPath, pngPath string) error {
 		return err
 	}
 
-	_, err = util.RunCommand("mmdc", "-i", tmpFile, "-o", pngPath, "-b", "transparent", "--scale", "3")
+	_, err = util.RunCommand("mmdc", "-i", tmpFile, "-o", pngPath, "-b", "transparent", "--scale", "8")
 	return err
 }
 
 // renderWithChrome nutzt einen headless Browser (via ChromeDP) zum Rendern.
 func renderWithChrome(content string, outputPath string) error {
+	encodedContent, _ := json.Marshal(content)
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>
-        mermaid.initialize({ startOnLoad: true, theme: 'default' });
-    </script>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
-        body { margin: 0; background: transparent; }
-        #container { display: inline-block; padding: 10px; background: white; }
+        body { margin: 0; background: transparent; overflow: hidden; }
+        #container { display: inline-block; padding: 20px; background: white; }
+        svg { display: block; }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div class="mermaid">
-%s
-        </div>
-    </div>
+    <div id="container"></div>
+    <script>
+        async function render() {
+            try {
+                mermaid.initialize({ startOnLoad: false, theme: 'default' });
+                const { svg } = await mermaid.render('mermaid-svg', %s);
+                document.getElementById('container').innerHTML = svg;
+                window.mermaidReady = true;
+            } catch (e) {
+                document.getElementById('container').innerHTML = 'Error: ' + e.message;
+                window.mermaidError = e.message;
+            }
+        }
+        render();
+    </script>
 </body>
 </html>
-`, content)
+`, string(encodedContent))
 
 	tmpFile := filepath.Join(os.TempDir(), util.HashString(content)+".html")
 	if err := os.WriteFile(tmpFile, []byte(html), 0644); err != nil {
@@ -95,21 +106,33 @@ func renderWithChrome(content string, outputPath string) error {
 	}
 	defer os.Remove(tmpFile)
 
-	ctx, cancel := chromedp.NewContext(context.Background())
+	// ChromeDP Optionen
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.DisableGPU,
+		chromedp.NoSandbox,
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
 
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 
 	var buf []byte
-	err := chromedp.Run(ctx,
+	if err := chromedp.Run(ctx,
 		chromedp.Navigate("file://"+tmpFile),
-		chromedp.WaitVisible(".mermaid svg", chromedp.ByQuery),
+		chromedp.WaitVisible("#container svg", chromedp.ByQuery),
 		chromedp.Sleep(500*time.Millisecond),
 		chromedp.Screenshot("#container", &buf, chromedp.ByID),
-	)
-	if err != nil {
-		return err
+	); err != nil {
+		return fmt.Errorf("ChromeDP Fehler: %w (Prüfen Sie Ihre Internetverbindung)", err)
+	}
+
+	if len(buf) == 0 {
+		return fmt.Errorf("Diagramm-Rendering ergab ein leeres Bild")
 	}
 
 	return os.WriteFile(outputPath, buf, 0644)

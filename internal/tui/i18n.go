@@ -16,11 +16,14 @@ type translation struct {
 	margins         string
 	save            string
 	buildPdf        string
+	openPdf         string
 	downloadFont    string
+	addToPath       string
 	project         string
 	noProject       string
 	statusSaved     string
 	statusError     string
+	statusPathAdded string
 	helpHeader      string
 	langSwitch      string
 	marginLabel     string
@@ -59,11 +62,14 @@ var translations = map[string]translation{
 		margins:         "Seitenränder (mm)",
 		save:            "Speichern",
 		buildPdf:        "📄 PDF generieren",
+		openPdf:         "📖 Letztes PDF öffnen",
 		downloadFont:    "📥 Fonts herunterladen",
+		addToPath:       "🚀 Zum PATH hinzufügen",
 		project:         "Projekt",
 		noProject:       "Kein Projekt geladen",
 		statusSaved:     "Konfiguration gespeichert!",
 		statusError:     "Fehler",
+		statusPathAdded: "Erfolgreich zum PATH hinzugefügt!",
 		helpHeader:      "📘 goDocGen - Hilfe & Funktionen",
 		langSwitch:      "Sprache wechseln (DE/EN)",
 		marginLabel:     "L:%v R:%v T:%v B:%v",
@@ -100,11 +106,14 @@ var translations = map[string]translation{
 		margins:         "Margins (mm)",
 		save:            "Save",
 		buildPdf:        "📄 Generate PDF",
+		openPdf:         "📖 Open latest PDF",
 		downloadFont:    "📥 Download Fonts",
+		addToPath:       "🚀 Add to PATH",
 		project:         "Project",
 		noProject:       "No project loaded",
 		statusSaved:     "Configuration saved!",
 		statusError:     "Error",
+		statusPathAdded: "Successfully added to PATH!",
 		helpHeader:      "📘 goDocGen - Help & Features",
 		langSwitch:      "Switch Language (DE/EN)",
 		marginLabel:     "L:%v R:%v T:%v B:%v",

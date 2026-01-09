@@ -27,7 +27,7 @@ func (g *Generator) setupHeaderFooter() {
 		g.pdf.SetY(10)
 		r, green, b := hexToRGB(g.cfg.Colors.Header)
 		g.pdf.SetTextColor(r, green, b)
-		g.pdf.SetFont("Main", "", 8)
+		g.safeSetFont("main", "", 8)
 
 		if g.cfg.Header.Image != "" {
 			g.pdf.Image(g.cfg.Header.Image, 10, 10, 20, 0, false, "", 0, "")
@@ -45,7 +45,7 @@ func (g *Generator) setupHeaderFooter() {
 			return
 		}
 		g.pdf.SetY(-15)
-		g.pdf.SetFont("Main", "", 8)
+		g.safeSetFont("main", "", 8)
 		g.pdf.SetTextColor(128, 128, 128)
 
 		left, _, right, _ := g.pdf.GetMargins()
@@ -108,14 +108,14 @@ func (g *Generator) renderFrontPage() {
 
 	g.pdf.SetY(60)
 	g.pdf.SetX(30)
-	g.pdf.SetFont("Main", "B", 40)
+	g.safeSetFont("main", "B", 40)
 	align := g.getAlign(g.cfg.Layout.StartPage)
 	g.pdf.MultiCell(0, 15, g.cfg.Title, "", align, false)
 
 	if g.cfg.Subtitle != "" {
 		g.pdf.Ln(5)
 		g.pdf.SetX(30)
-		g.pdf.SetFont("Main", "", 20)
+		g.safeSetFont("main", "", 20)
 		if !g.cfg.Gradient.Enabled {
 			g.pdf.SetTextColor(100, 100, 100)
 		}
@@ -125,7 +125,7 @@ func (g *Generator) renderFrontPage() {
 	if g.cfg.Author != "" {
 		g.pdf.Ln(5)
 		g.pdf.SetX(30)
-		g.pdf.SetFont("Main", "I", 14)
+		g.safeSetFont("main", "I", 14)
 		if !g.cfg.Gradient.Enabled {
 			g.pdf.SetTextColor(120, 120, 120)
 		}
@@ -134,7 +134,7 @@ func (g *Generator) renderFrontPage() {
 
 	g.pdf.SetY(250)
 	g.pdf.SetX(30)
-	g.pdf.SetFont("Main", "", 12)
+	g.safeSetFont("main", "", 12)
 	if !g.cfg.Gradient.Enabled {
 		g.pdf.SetTextColor(128, 128, 128)
 	}

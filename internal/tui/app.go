@@ -4,6 +4,7 @@ package tui
 import (
 	"godocgen/internal/config"
 	"godocgen/internal/engine"
+	"godocgen/internal/util"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,6 +57,7 @@ type model struct {
 	configSectionsOpen []bool
 	focusedSection     int
 	logs               []string
+	lastGeneratedPath  string
 }
 
 const totalInputs = 36
@@ -693,7 +695,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = ""
 		case key.Matches(msg, m.keys.Up):
 			if m.state == stateActions {
-				m.selectedAction = (m.selectedAction + 1) % 2
+				m.selectedAction = (m.selectedAction + 3) % 4
 			} else if m.state == stateProjects && len(m.history.RecentProjects) > 0 {
 				m.selectedProject = (m.selectedProject + len(m.history.RecentProjects) - 1) % len(m.history.RecentProjects)
 			} else if m.state == stateThemes {
@@ -705,7 +707,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.Down):
 			if m.state == stateActions {
-				m.selectedAction = (m.selectedAction + 1) % 2
+				m.selectedAction = (m.selectedAction + 1) % 4
 			} else if m.state == stateProjects && len(m.history.RecentProjects) > 0 {
 				m.selectedProject = (m.selectedProject + 1) % len(m.history.RecentProjects)
 			} else if m.state == stateThemes {
@@ -772,8 +774,8 @@ func (m *model) performAction() tea.Cmd {
 		if m.cfg == nil {
 			return actionResultMsg("Kein Projekt geladen.")
 		}
-		if m.selectedAction == 0 {
-			// PDF Generieren
+		switch m.selectedAction {
+		case 0: // PDF Generieren
 			m.log("Starte PDF-Generierung...")
 			builder := engine.NewBuilder(m.projectPath, filepath.Join(m.projectPath, "dist"))
 			path, err := builder.Build()
@@ -781,11 +783,21 @@ func (m *model) performAction() tea.Cmd {
 				m.log("Build-Fehler: " + err.Error())
 				return actionResultMsg(fmt.Sprintf("Fehler: %v", err))
 			}
+			m.lastGeneratedPath = path
 			m.log("PDF erfolgreich generiert: " + filepath.Base(path))
 			m.log("Pfad: " + path)
 			return actionResultMsg("PDF wurde erfolgreich generiert!")
-		} else {
-			// Fonts verarbeiten
+		case 1: // PDF Öffnen
+			if m.lastGeneratedPath == "" {
+				return actionResultMsg("Noch kein PDF in dieser Sitzung generiert.")
+			}
+			m.log("Öffne PDF: " + m.lastGeneratedPath)
+			err := util.OpenPath(m.lastGeneratedPath)
+			if err != nil {
+				return actionResultMsg("Fehler beim Öffnen: " + err.Error())
+			}
+			return actionResultMsg("PDF geöffnet.")
+		case 2: // Fonts verarbeiten
 			m.log("Verarbeite Schriften...")
 			if m.cfg.Fonts.URL == "" {
 				m.log("Abbruch: Keine Font-URL definiert.")
@@ -799,6 +811,17 @@ func (m *model) performAction() tea.Cmd {
 			}
 			m.log("Schriften erfolgreich verarbeitet.")
 			return actionResultMsg("Fonts wurden erfolgreich verarbeitet!")
+		case 3: // Zum PATH hinzufügen
+			m.log("Füge Programm zum PATH hinzu...")
+			err := util.AddToPath()
+			if err != nil {
+				m.log("PATH-Fehler: " + err.Error())
+				return actionResultMsg("Fehler: " + err.Error())
+			}
+			m.log("Erfolgreich zum PATH hinzugefügt.")
+			return actionResultMsg(m.T(func(t translation) string { return t.statusPathAdded }))
+		default:
+			return actionResultMsg("Unbekannte Aktion.")
 		}
 	}
 }
@@ -1135,7 +1158,9 @@ func (m *model) actionsView() string {
 
 	actions := []string{
 		m.T(func(t translation) string { return t.buildPdf }),
+		m.T(func(t translation) string { return t.openPdf }),
 		m.T(func(t translation) string { return t.downloadFont }),
+		m.T(func(t translation) string { return t.addToPath }),
 	}
 	for i, a := range actions {
 		prefix := "  "

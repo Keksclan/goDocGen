@@ -4,6 +4,7 @@ package pdf
 import (
 	"godocgen/internal/blocks"
 	"fmt"
+	"strings"
 )
 
 // renderBlock entscheidet anhand des Typs des Blocks, welche Rendering-Funktion aufgerufen wird.
@@ -30,6 +31,7 @@ func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 
 // safeSetFont setzt die Schriftart sicher und fällt auf Fallback-Schriften zurück, falls die gewünschte fehlt.
 func (g *Generator) safeSetFont(family string, style string, size float64) {
+	family = strings.ToLower(family)
 	key := family
 	if style != "" {
 		key = family + style
@@ -37,8 +39,8 @@ func (g *Generator) safeSetFont(family string, style string, size float64) {
 
 	if g.registeredFonts[key] {
 		g.pdf.SetFont(family, style, size)
-	} else if g.registeredFonts["Main"] {
-		g.pdf.SetFont("Main", "", size)
+	} else if g.registeredFonts["main"] {
+		g.pdf.SetFont("main", "", size)
 	} else {
 		g.pdf.SetFont("Arial", style, size)
 	}
@@ -93,7 +95,7 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	g.checkPageBreak(size + spacing + 20)
 
 	g.pdf.Ln(spacing)
-	g.safeSetFont("Main", "B", size)
+	g.safeSetFont("main", "B", size)
 	r, green, b := hexToRGB(g.cfg.Colors.Title)
 	g.pdf.SetTextColor(r, green, b)
 
@@ -120,17 +122,20 @@ func (g *Generator) safeWrite(size float64, text string, family string, style st
 		return
 	}
 
+	family = strings.ToLower(family)
 	key := family
 	if style != "" {
 		key = family + style
 	}
 
 	if !g.registeredFonts[key] {
-		if g.registeredFonts["Main"] {
-			g.pdf.SetFont("Main", "", g.cfg.FontSize)
+		if g.registeredFonts["main"] {
+			g.pdf.SetFont("main", "", g.cfg.FontSize)
 		} else {
 			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
 		}
+	} else {
+		g.pdf.SetFont(family, style, g.cfg.FontSize)
 	}
 
 	defer func() {
@@ -148,17 +153,20 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 		return
 	}
 
+	family = strings.ToLower(family)
 	key := family
 	if style != "" {
 		key = family + style
 	}
 
 	if !g.registeredFonts[key] {
-		if g.registeredFonts["Main"] {
-			g.pdf.SetFont("Main", "", g.cfg.FontSize)
+		if g.registeredFonts["main"] {
+			g.pdf.SetFont("main", "", g.cfg.FontSize)
 		} else {
 			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
 		}
+	} else {
+		g.pdf.SetFont(family, style, g.cfg.FontSize)
 	}
 
 	defer func() {
@@ -172,8 +180,13 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 
 // renderParagraph rendert einen Textabsatz mit Unterstützung für Fett, Kursiv und Inline-Code.
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
-	g.safeSetFont("Main", "", g.cfg.FontSize)
+	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
+
+	lineHeight := g.cfg.FontSize * 0.5
+	if lineHeight < 5 {
+		lineHeight = 5
+	}
 
 	for _, seg := range p.Content {
 		style := ""
@@ -185,30 +198,30 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 		}
 
 		if seg.Code {
-			fontFamily := "Main"
+			fontFamily := "main"
 			if g.cfg.Fonts.Mono != "" {
-				fontFamily = "Mono"
+				fontFamily = "mono"
 			}
 			g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
 			g.pdf.SetFillColor(240, 240, 240)
 			if seg.Text != "" {
-				g.safeWrite(g.cfg.FontSize/2, seg.Text, fontFamily, "I")
+				g.safeWrite(lineHeight, seg.Text, fontFamily, "I")
 			}
 		} else {
-			g.safeSetFont("Main", style, g.cfg.FontSize)
+			g.safeSetFont("main", style, g.cfg.FontSize)
 			if seg.Text != "" {
-				g.safeWrite(g.cfg.FontSize/2, seg.Text, "Main", style)
+				g.safeWrite(lineHeight, seg.Text, "main", style)
 			}
 		}
 	}
-	g.pdf.Ln(g.cfg.FontSize/2 + 5)
+	g.pdf.Ln(lineHeight + 2)
 }
 
 // renderCode rendert einen Codeblock mit Syntax-Highlighting und abgerundeten Ecken.
 func (g *Generator) renderCode(c blocks.CodeBlock) {
-	fontFamily := "Main"
+	fontFamily := "main"
 	if g.cfg.Fonts.Mono != "" {
-		fontFamily = "Mono"
+		fontFamily = "mono"
 	}
 
 	g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
@@ -249,7 +262,7 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF")
 
 	if c.Language != "" {
-		g.safeSetFont("Main", "B", 7)
+		g.safeSetFont("main", "B", 7)
 		g.pdf.SetTextColor(150, 150, 150)
 		labelW := g.pdf.GetStringWidth(c.Language) + 4
 		g.pdf.SetXY(x+width-labelW-2, y+2)
@@ -339,7 +352,7 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	y := g.pdf.GetY()
 
 	if i.Title != "" {
-		g.pdf.SetFont("Main", "B", 10)
+		g.safeSetFont("main", "B", 10)
 		g.pdf.SetTextColor(100, 100, 100)
 		g.pdf.CellFormat(0, 8, i.Title, "", 1, "C", false, 0, "")
 		g.pdf.Ln(2)
@@ -362,19 +375,32 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 
 // renderList rendert eine Aufzählung oder nummerierte Liste.
 func (g *Generator) renderList(l blocks.ListBlock) {
-	g.pdf.SetFont("Main", "", g.cfg.FontSize)
+	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
+	lineHeight := g.cfg.FontSize * 0.5
+	if lineHeight < 5 {
+		lineHeight = 5
+	}
+
 	for i, item := range l.Items {
 		prefix := "• "
 		if l.Ordered {
 			prefix = fmt.Sprintf("%d. ", i+1)
 		}
 		g.pdf.SetX(15)
-		g.pdf.Write(g.cfg.FontSize/2, prefix)
+		g.pdf.Write(lineHeight, prefix)
 		for _, seg := range item.Content {
-			g.pdf.Write(g.cfg.FontSize/2, seg.Text)
+			style := ""
+			if seg.Bold {
+				style += "B"
+			}
+			if seg.Italic {
+				style += "I"
+			}
+			g.safeSetFont("Main", style, g.cfg.FontSize)
+			g.safeWrite(lineHeight, seg.Text, "Main", style)
 		}
-		g.pdf.Ln(g.cfg.FontSize/2 + 2)
+		g.pdf.Ln(lineHeight + 2)
 	}
 	g.pdf.Ln(5)
 }
@@ -393,7 +419,7 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	}
 	colWidth := width / float64(colCount)
 
-	g.pdf.SetFont("Main", "B", g.cfg.FontSize)
+	g.safeSetFont("main", "B", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 
 	for _, row := range t.Rows {
@@ -422,9 +448,9 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 			if cell.Header {
 				g.pdf.SetFillColor(240, 240, 240)
 				g.pdf.Rect(x, y, colWidth, maxH, "F")
-				g.pdf.SetFont("Main", "B", g.cfg.FontSize)
+				g.safeSetFont("main", "B", g.cfg.FontSize)
 			} else {
-				g.pdf.SetFont("Main", "", g.cfg.FontSize)
+				g.safeSetFont("main", "", g.cfg.FontSize)
 			}
 
 			g.pdf.Rect(x, y, colWidth, maxH, "D")

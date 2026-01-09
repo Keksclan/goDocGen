@@ -43,20 +43,27 @@ func (b *Builder) Build() (string, error) {
 	}
 
 	// 2. Schriften extrahieren/herunterladen
-	var fontZip string
-	if cfg.Fonts.URL != "" {
+	var fontDir string
+	if cfg.Fonts.Zip != "" || cfg.Fonts.URL != "" {
+		var fontZip string
+		if cfg.Fonts.URL != "" {
+			var err error
+			fontZip, err = fonts.DownloadFonts(cfg.Fonts.URL, b.CacheDir)
+			if err != nil {
+				return "", fmt.Errorf("Schriften konnten nicht heruntergeladen werden: %w", err)
+			}
+		} else {
+			fontZip = filepath.Join(b.ProjectDir, cfg.Fonts.Zip)
+		}
+
 		var err error
-		fontZip, err = fonts.DownloadFonts(cfg.Fonts.URL, b.CacheDir)
+		fontDir, err = fonts.ExtractFonts(fontZip, b.CacheDir)
 		if err != nil {
-			return "", fmt.Errorf("Schriften konnten nicht heruntergeladen werden: %w", err)
+			return "", fmt.Errorf("Schriftartenfehler: %w", err)
 		}
 	} else {
-		fontZip = filepath.Join(b.ProjectDir, cfg.Fonts.Zip)
-	}
-
-	fontDir, err := fonts.ExtractFonts(fontZip, b.CacheDir)
-	if err != nil {
-		return "", fmt.Errorf("Schriftartenfehler: %w", err)
+		// System-Fonts Modus: fontDir bleibt leer, Pfade werden absolut oder relativ zum Projekt aufgelöst
+		fontDir = b.ProjectDir
 	}
 
 	// 3. Markdown-Dateien rekursiv laden
@@ -75,7 +82,16 @@ func (b *Builder) Build() (string, error) {
 		return "", fmt.Errorf("Content-Verzeichnis konnte nicht gelesen werden: %w", err)
 	}
 
-	sort.Strings(mdFiles)
+	sort.Slice(mdFiles, func(i, j int) bool {
+		// Sortiere primär nach Dateiname, ignoriere Ordnerstruktur für die Reihenfolge
+		// falls Dateinamen gleich sind, nimm den vollen Pfad als Fallback
+		baseI := filepath.Base(mdFiles[i])
+		baseJ := filepath.Base(mdFiles[j])
+		if baseI != baseJ {
+			return baseI < baseJ
+		}
+		return mdFiles[i] < mdFiles[j]
+	})
 
 	var allBlocks []blocks.DocBlock
 	for _, path := range mdFiles {

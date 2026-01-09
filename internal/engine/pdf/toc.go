@@ -51,7 +51,7 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 
 	// Titel des Inhaltsverzeichnisses
 	g.pdf.SetY(40)
-	g.safeSetFont("Main", "B", 24)
+	g.safeSetFont("main", "B", 24)
 	r, green, b := hexToRGB(g.cfg.Colors.Title)
 	g.pdf.SetTextColor(r, green, b)
 	g.pdf.CellFormat(0, 15, "Inhaltsverzeichnis", "", 1, "L", false, 0, "")
@@ -73,10 +73,10 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 		style := ""
 		if entry.Level == 1 {
 			style = "B"
-			g.safeSetFont("Main", style, 12)
+			g.safeSetFont("main", style, 12)
 			g.pdf.Ln(2)
 		} else {
-			g.safeSetFont("Main", "", 11)
+			g.safeSetFont("main", "", 11)
 			fontSize = 11.0
 		}
 
@@ -87,11 +87,11 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 		text += entry.Text
 
 		// Eintragstext als Link
-		g.safeWriteLinkID(fontSize, text, "Main", style, entry.Link)
+		g.safeWriteLinkID(fontSize, text, "main", style, entry.Link)
 
 		// Punkte zwischen Text und Seitenzahl
 		if g.cfg.TOC.ShowDots {
-			g.safeSetFont("Main", "", 10)
+			g.safeSetFont("main", "", 10)
 			g.pdf.SetTextColor(180, 180, 180)
 			dotX := g.pdf.GetX() + 2
 			dotEndX := 210 - right - 10
@@ -108,7 +108,7 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 
 		// Seitenzahl
 		g.setPrimaryTextColor()
-		g.safeSetFont("Main", "B", fontSize)
+		g.safeSetFont("main", "B", fontSize)
 		g.pdf.SetX(210 - right - 8)
 		displayPage := entry.Page - g.cfg.PageNumbers.StartPage + 1
 		if displayPage < 1 {

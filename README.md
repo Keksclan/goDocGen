@@ -11,7 +11,7 @@ goDocGen ist ein CLI-Tool zur Erzeugung professioneller PDF-Dokumentation aus Ma
 - 🖱️ **Interaktives TUI**: Starten Sie das Interface mit `godocgen tui`. Es merkt sich zuletzt geöffnete Projekte für schnellen Zugriff.
 - ⏬ **Font Downloader**: Laden Sie Schriftarten direkt via URL in der Konfiguration.
 - 📑 **Interaktive Navigation**: Automatische Inhaltsverzeichnisse mit klickbaren Links zu den Kapiteln.
-- 📁 **Hierarchische Struktur**: Ordnerbasierte Organisation des Contents wird automatisch in die Dokumentenstruktur übernommen.
+- 📁 **Flache Struktur**: Die Dokumentenstruktur wird ausschließlich durch Überschriften in den Markdown-Dateien definiert. Ordner dienen nur der Organisation und beeinflussen nicht die Hierarchie.
 - 📦 **Publishing Ready**: Automatisierte Versionierung der PDFs im `dist` Ordner.
 
 ## Installation

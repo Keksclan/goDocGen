@@ -33,7 +33,7 @@ func InitialInitModel(defaultPath string) InitModel {
 
 	return InitModel{
 		pathInput:    ti,
-		themeChoices: []string{"Catppuccin Mocha (Dunkel)", "Catppuccin Latte (Hell)", "Catppuccin Frappe", "Catppuccin Macchiato"},
+		themeChoices: []string{"Catppuccin Mocha (Dunkel)", "Catppuccin Latte (Hell)", "Catppuccin Frappe", "Catppuccin Macchiato", "Red White (Modern)"},
 		step:         0,
 		Path:         defaultPath,
 	}
@@ -111,6 +111,10 @@ func (m InitModel) finishInit() tea.Cmd {
 			theme = "catppuccin-macchiato"
 			accent = "#8ad1fa"
 			titleColor = "#8aadf4"
+		case 4:
+			theme = "red-white"
+			accent = "#e30613"
+			titleColor = "#e30613"
 		}
 
 		dirs := []string{"content", "assets", "fonts"}

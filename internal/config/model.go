@@ -78,12 +78,12 @@ type Colors struct {
 
 // Fonts definiert die zu verwendenden Schriftarten.
 type Fonts struct {
-	Zip     string `yaml:"zip" validate:"required_without=URL"` // Pfad zu einem ZIP mit TTF-Dateien
-	URL     string `yaml:"url" validate:"omitempty,url"`        // URL zum Download eines Font-ZIPs
-	Regular string `yaml:"regular" validate:"required"`         // Dateiname der normalen Schriftart
-	Bold    string `yaml:"bold"`                                // Dateiname der fetten Schriftart
-	Italic  string `yaml:"italic"`                              // Dateiname der kursiven Schriftart
-	Mono    string `yaml:"mono"`                                // Dateiname der Monospace-Schriftart
+	Zip     string `yaml:"zip"`                          // Pfad zu einem ZIP mit TTF-Dateien (optional bei System-Fonts)
+	URL     string `yaml:"url" validate:"omitempty,url"` // URL zum Download eines Font-ZIPs
+	Regular string `yaml:"regular" validate:"required"`  // Dateiname oder absoluter Pfad zur Schriftart
+	Bold    string `yaml:"bold"`                         // Dateiname oder absoluter Pfad
+	Italic  string `yaml:"italic"`                       // Dateiname oder absoluter Pfad
+	Mono    string `yaml:"mono"`                         // Dateiname oder absoluter Pfad
 }
 
 // PageNumbers steuert die Anzeige von Seitenzahlen.

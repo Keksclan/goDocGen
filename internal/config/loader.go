@@ -173,6 +173,14 @@ func GetThemeColors(theme string) Colors {
 			Text:       "#2e3440",
 			Accent:     "#88c0d0",
 		}
+	case "red-white":
+		return Colors{
+			Title:      "#e30613", // Kräftiges Rot
+			Header:     "#333333", // Dunkles Grau für Header-Text
+			Background: "#ffffff", // Weißer Hintergrund
+			Text:       "#1a1a1a", // Fast schwarz für Text
+			Accent:     "#e30613", // Rote Akzente
+		}
 	default:
 		return Colors{
 			Title:  "#1e66f5",
@@ -198,6 +206,7 @@ func GetAvailableThemes() []string {
 		"gruvbox-light",
 		"one-light",
 		"nord-light",
+		"red-white",
 	}
 }
 
