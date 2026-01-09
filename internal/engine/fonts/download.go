@@ -1,3 +1,4 @@
+// Package fonts bietet Funktionen zum Herunterladen und Extrahieren von Schriftarten.
 package fonts
 
 import (
@@ -9,6 +10,8 @@ import (
 	"godocgen/internal/util"
 )
 
+// DownloadFonts lädt eine ZIP-Datei mit Schriftarten von der angegebenen URL herunter
+// und speichert sie im Cache-Verzeichnis.
 func DownloadFonts(url, cacheDir string) (string, error) {
 	// Erstelle einen Hash der URL, um einen eindeutigen Dateinamen zu haben
 	urlHash := util.HashString(url)
@@ -21,32 +24,31 @@ func DownloadFonts(url, cacheDir string) (string, error) {
 
 	// Verzeichnis erstellen
 	if err := os.MkdirAll(filepath.Dir(zipPath), 0755); err != nil {
-		return "", fmt.Errorf("could not create download dir: %w", err)
+		return "", fmt.Errorf("Download-Verzeichnis konnte nicht erstellt werden: %w", err)
 	}
 
-	// Download
+	// Download ausführen
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed to download fonts: %w", err)
+		return "", fmt.Errorf("Fehler beim Herunterladen der Schriften: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download fonts: status code %d", resp.StatusCode)
+		return "", fmt.Errorf("Fehler beim Herunterladen der Schriften: Statuscode %d", resp.StatusCode)
 	}
 
 	// In Datei speichern
 	out, err := os.Create(zipPath)
 	if err != nil {
-		return "", fmt.Errorf("could not create zip file: %w", err)
+		return "", fmt.Errorf("ZIP-Datei konnte nicht erstellt werden: %w", err)
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to save zip file: %w", err)
+		return "", fmt.Errorf("ZIP-Datei konnte nicht gespeichert werden: %w", err)
 	}
 
 	return zipPath, nil
 }
-

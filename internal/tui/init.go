@@ -12,16 +12,19 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// InitModel steuert den Prozess der Projekt-Initialisierung in der TUI.
 type InitModel struct {
 	pathInput     textinput.Model
 	themeChoices  []string
 	cursor        int
-	step          int // 0: Path, 1: Theme selection
+	step          int // 0: Pfadeingabe, 1: Theme-Auswahl
 	done          bool
 	err           error
 	selectedTheme string
+	Path          string // Öffentlich für Zugriff aus app.go
 }
 
+// InitialInitModel erstellt ein neues Modell für die Initialisierung.
 func InitialInitModel(defaultPath string) InitModel {
 	ti := textinput.New()
 	ti.Placeholder = "Projektpfad (z.B. ./mein-projekt)"
@@ -32,6 +35,7 @@ func InitialInitModel(defaultPath string) InitModel {
 		pathInput:    ti,
 		themeChoices: []string{"Catppuccin Mocha (Dunkel)", "Catppuccin Latte (Hell)", "Catppuccin Frappe", "Catppuccin Macchiato"},
 		step:         0,
+		Path:         defaultPath,
 	}
 }
 
@@ -39,20 +43,25 @@ func (m InitModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// Update verarbeitet Eingaben während der Initialisierung.
 func (m InitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyCtrlC:
 			return m, tea.Quit
+		case tea.KeyEsc:
+			// Esc macht hier nichts oder bricht ab, ohne das Programm zu beenden
+			return m, nil
 
 		case tea.KeyEnter:
 			if m.step == 0 {
 				if m.pathInput.Value() == "" {
 					m.pathInput.SetValue(".")
 				}
+				m.Path = m.pathInput.Value()
 				m.step = 1
 				return m, nil
 			} else {
@@ -75,34 +84,35 @@ func (m InitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.step == 0 {
 		m.pathInput, cmd = m.pathInput.Update(msg)
+		m.Path = m.pathInput.Value()
 	}
 
 	return m, cmd
 }
 
+// finishInit führt die eigentliche Dateierstellung durch.
 func (m InitModel) finishInit() tea.Cmd {
 	return func() tea.Msg {
-		target := m.pathInput.Value()
+		target := m.Path
 		theme := "catppuccin-mocha"
-		accent := "#89b4fa" // Mocha Blue
+		accent := "#89b4fa"
 		titleColor := "#89b4fa"
 
 		switch m.cursor {
-		case 1: // Latte
+		case 1:
 			theme = "catppuccin-latte"
-			accent = "#1e66f5" // Latte Blue
+			accent = "#1e66f5"
 			titleColor = "#1e66f5"
-		case 2: // Frappe
+		case 2:
 			theme = "catppuccin-frappe"
-			accent = "#8caaee" // Frappe Blue
+			accent = "#8caaee"
 			titleColor = "#8caaee"
-		case 3: // Macchiato
+		case 3:
 			theme = "catppuccin-macchiato"
-			accent = "#8ad1fa" // Macchiato Sky (Blue ist #8aadf4)
+			accent = "#8ad1fa"
 			titleColor = "#8aadf4"
 		}
 
-		// Verzeichnisse erstellen
 		dirs := []string{"content", "assets", "fonts"}
 		for _, d := range dirs {
 			if err := os.MkdirAll(filepath.Join(target, d), 0755); err != nil {
@@ -110,7 +120,6 @@ func (m InitModel) finishInit() tea.Cmd {
 			}
 		}
 
-		// docgen.yml erstellen
 		configContent := fmt.Sprintf(`title: "Meine Dokumentation"
 subtitle: "Erstellt mit goDocGen"
 author: "Dein Name"
@@ -150,11 +159,9 @@ code_theme: "%s"
 			return err
 		}
 
-		// Sample Content
 		sample := "# Willkommen\n\nDies ist dein neues Projekt."
 		os.WriteFile(filepath.Join(target, "content", "01_intro.md"), []byte(sample), 0644)
 
-		// Git init
 		gitInit := exec.Command("git", "init")
 		gitInit.Dir = target
 		gitInit.Run()
@@ -163,6 +170,7 @@ code_theme: "%s"
 	}
 }
 
+// View rendert die Initialisierungs-Ansicht.
 func (m InitModel) View() string {
 	if m.done {
 		return lipgloss.NewStyle().
@@ -170,7 +178,7 @@ func (m InitModel) View() string {
 			Background(lipgloss.Color("#313244")).
 			Padding(1, 2).
 			Bold(true).
-			Render(fmt.Sprintf("✓ Projekt in %s erfolgreich initialisiert!\nTheme: %s\nGit wurde ebenfalls initialisiert.", m.pathInput.Value(), m.selectedTheme))
+			Render(fmt.Sprintf("✓ Projekt in %s erfolgreich initialisiert!\nTheme: %s\nGit wurde ebenfalls initialisiert.", m.Path, m.selectedTheme))
 	}
 
 	var s strings.Builder

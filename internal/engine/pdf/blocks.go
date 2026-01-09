@@ -1,3 +1,4 @@
+// Package pdf enthält die Logik zum Rendern der verschiedenen Dokumentblöcke.
 package pdf
 
 import (
@@ -5,6 +6,7 @@ import (
 	"fmt"
 )
 
+// renderBlock entscheidet anhand des Typs des Blocks, welche Rendering-Funktion aufgerufen wird.
 func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 	switch b := block.(type) {
 	case blocks.HeadingBlock:
@@ -16,7 +18,7 @@ func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 	case blocks.ImageBlock:
 		g.renderImage(b)
 	case blocks.MermaidBlock:
-		// Will be handled during builder phase (rendered to PNG)
+		// Mermaid-Blöcke wurden bereits im Builder zu PNGs umgewandelt.
 	case blocks.ListBlock:
 		g.renderList(b)
 	case blocks.TableBlock:
@@ -26,8 +28,8 @@ func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 	}
 }
 
+// safeSetFont setzt die Schriftart sicher und fällt auf Fallback-Schriften zurück, falls die gewünschte fehlt.
 func (g *Generator) safeSetFont(family string, style string, size float64) {
-	// Map family+style to our registeredFonts keys
 	key := family
 	if style != "" {
 		key = family + style
@@ -36,31 +38,33 @@ func (g *Generator) safeSetFont(family string, style string, size float64) {
 	if g.registeredFonts[key] {
 		g.pdf.SetFont(family, style, size)
 	} else if g.registeredFonts["Main"] {
-		// Fallback to Main Regular if specific style/family missing
 		g.pdf.SetFont("Main", "", size)
 	} else {
-		// Absolute fallback to built-in font
 		g.pdf.SetFont("Arial", style, size)
 	}
 }
 
+// renderHeading rendert eine Überschrift mit automatischer Nummerierung und Inhaltsverzeichniseintrag.
 func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
-	// Update heading counts for numbering
 	if h.Level > 0 && h.Level <= len(g.headingCounts) {
 		g.headingCounts[h.Level-1]++
-		// Reset sub-levels
 		for i := h.Level; i < len(g.headingCounts); i++ {
 			g.headingCounts[i] = 0
 		}
 	}
 
-	// Generate numbering string (e.g., "1.2.3 ")
 	numbering := ""
-	for i := 0; i < h.Level; i++ {
-		numbering += fmt.Sprintf("%d.", g.headingCounts[i])
-	}
-	if numbering != "" {
-		numbering += " "
+	if g.cfg.Layout.HeaderNumbering {
+		for i := 0; i < h.Level; i++ {
+			count := g.headingCounts[i]
+			if count == 0 {
+				count = 1
+			}
+			numbering += fmt.Sprintf("%d.", count)
+		}
+		if numbering != "" {
+			numbering += " "
+		}
 	}
 
 	link := g.pdf.AddLink()
@@ -75,24 +79,24 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 	g.pdf.SetLink(link, g.pdf.GetY(), -1)
 
-	size := 18.0
+	size := 14.0
+	spacing := 3.0
 	if h.Level == 1 {
 		size = 22.0
-		g.pdf.Ln(10)
+		spacing = 10.0
 	} else if h.Level == 2 {
 		size = 18.0
-		g.pdf.Ln(5)
-	} else {
-		size = 14.0
-		g.pdf.Ln(3)
+		spacing = 5.0
 	}
 
+	// Bessere Seitenumbrüche für Überschriften (verhindert Orphan-Headings)
+	g.checkPageBreak(size + spacing + 20)
+
+	g.pdf.Ln(spacing)
 	g.safeSetFont("Main", "B", size)
-	g.checkPageBreak(size + 15)
 	r, green, b := hexToRGB(g.cfg.Colors.Title)
 	g.pdf.SetTextColor(r, green, b)
 
-	// Modern accent: small line before heading
 	if h.Level == 1 {
 		left, _, _, _ := g.pdf.GetMargins()
 		accentR, accentG, accentB := r, green, b
@@ -105,10 +109,12 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 
 	displayText := numbering + h.Text
-	g.pdf.MultiCell(0, 10, displayText, "", "L", false)
+	align := g.getAlign(g.cfg.Layout.Body)
+	g.pdf.MultiCell(0, 10, displayText, "", align, false)
 	g.pdf.Ln(3)
 }
 
+// safeWrite schreibt Text sicher in das PDF und fängt Panics der PDF-Bibliothek ab.
 func (g *Generator) safeWrite(size float64, text string, family string, style string) {
 	if text == "" {
 		return
@@ -119,29 +125,24 @@ func (g *Generator) safeWrite(size float64, text string, family string, style st
 		key = family + style
 	}
 
-	// Verify if the current font is really registered and set in gofpdf
 	if !g.registeredFonts[key] {
-		// If the requested font/style combination is not registered, 
-		// we fallback to "Main" Regular which should be the safest UTF-8 font.
 		if g.registeredFonts["Main"] {
 			g.pdf.SetFont("Main", "", g.cfg.FontSize)
 		} else {
-			// Absolute fallback to built-in Arial (non-UTF8)
 			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
 		}
 	}
 
-	// gofpdf's Write can panic if currentFont is nil or invalid.
-	// We wrap it in a recover to prevent the whole app from crashing if a character is still problematic.
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("Recovered from gofpdf panic during Write: %v (Text: %s)\n", r, text)
+			fmt.Printf("Panic in gofpdf abgefangen (Write): %v (Text: %s)\n", r, text)
 		}
 	}()
 
 	g.pdf.Write(size, text)
 }
 
+// safeWriteLinkID schreibt einen klickbaren Link sicher in das PDF.
 func (g *Generator) safeWriteLinkID(size float64, text string, family string, style string, link int) {
 	if text == "" {
 		return
@@ -162,13 +163,14 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("Recovered from gofpdf panic during WriteLinkID: %v (Text: %s)\n", r, text)
+			fmt.Printf("Panic in gofpdf abgefangen (WriteLinkID): %v (Text: %s)\n", r, text)
 		}
 	}()
 
 	g.pdf.WriteLinkID(size, text, link)
 }
 
+// renderParagraph rendert einen Textabsatz mit Unterstützung für Fett, Kursiv und Inline-Code.
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 	g.safeSetFont("Main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
@@ -202,6 +204,7 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 	g.pdf.Ln(g.cfg.FontSize/2 + 5)
 }
 
+// renderCode rendert einen Codeblock mit Syntax-Highlighting und abgerundeten Ecken.
 func (g *Generator) renderCode(c blocks.CodeBlock) {
 	fontFamily := "Main"
 	if g.cfg.Fonts.Mono != "" {
@@ -209,22 +212,16 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	}
 
 	g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
-	bgR, bgG, bgB := 245, 245, 245 // Light grey background for container
+	bgR, bgG, bgB := 245, 245, 245
 	if c.BgColor != "" {
 		r, green, b := hexToRGB(c.BgColor)
-		// If background is very light (white), keep our light grey for container visibility
 		if r < 250 || green < 250 || b < 250 {
 			bgR, bgG, bgB = r, green, b
 		}
 	}
 	g.pdf.SetFillColor(bgR, bgG, bgB)
-	g.pdf.SetDrawColor(200, 200, 200) // Light grey border
+	g.pdf.SetDrawColor(200, 200, 200)
 
-	// Draw a box for code
-	x := g.pdf.GetX()
-	y := g.pdf.GetY()
-
-	// Simple height estimation
 	lineCount := 0
 	for _, seg := range c.Segments {
 		for _, r := range seg.Text {
@@ -242,17 +239,15 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	lineHeight := g.cfg.FontSize * 0.5
 	rectHeight := float64(lineCount)*lineHeight + 10
 
-	// Intelligent page break for code block
 	g.checkPageBreak(rectHeight + 10)
 
-	x = g.pdf.GetX()
-	y = g.pdf.GetY()
+	x := g.pdf.GetX()
+	y := g.pdf.GetY()
 	left, _, right, _ := g.pdf.GetMargins()
 	width := 210 - left - right
 
-	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF") // Rounded corners
+	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF")
 
-	// Language label (top right inside)
 	if c.Language != "" {
 		g.safeSetFont("Main", "B", 7)
 		g.pdf.SetTextColor(150, 150, 150)
@@ -261,8 +256,8 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 		g.pdf.CellFormat(labelW, 4, c.Language, "", 0, "R", false, 0, "")
 	}
 
-	g.pdf.SetX(x + 5) // Padding
-	g.pdf.SetY(y + 5) // Padding
+	g.pdf.SetX(x + 5)
+	g.pdf.SetY(y + 5)
 
 	for _, seg := range c.Segments {
 		if seg.Color != "" {
@@ -272,7 +267,6 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 			g.setPrimaryTextColor()
 		}
 
-		// Handle newlines to keep X position
 		text := seg.Text
 		for {
 			idx := -1
@@ -305,13 +299,13 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	g.pdf.Ln(2)
 }
 
+// renderImage rendert ein Bild mit automatischer Skalierung und optionalem Titel.
 func (g *Generator) renderImage(i blocks.ImageBlock) {
-	// Register image to get info
 	g.pdf.RegisterImage(i.Path, "")
 	info := g.pdf.GetImageInfo(i.Path)
 	left, top, right, bottom := g.pdf.GetMargins()
 	maxWidth := 210 - left - right
-	maxPageHeight := 297 - top - bottom - 40 // Adjusted for header/footer
+	maxPageHeight := 297 - top - bottom - 40
 
 	widthOnPage := maxWidth - 20
 	var h float64
@@ -321,17 +315,14 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 		h = 60.0
 	}
 
-	// Add title height if exists
 	titleHeight := 0.0
 	if i.Title != "" {
 		titleHeight = 10.0
 	}
 
-	// Intelligent scaling and page break
 	if h+titleHeight > maxPageHeight {
-		// Scale down to fit one whole page
 		h = maxPageHeight - titleHeight
-		widthOnPage = 0 // Auto-width based on h
+		widthOnPage = 0
 	}
 
 	padding := 5.0
@@ -347,7 +338,6 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	x := g.pdf.GetX()
 	y := g.pdf.GetY()
 
-	// Render Title
 	if i.Title != "" {
 		g.pdf.SetFont("Main", "B", 10)
 		g.pdf.SetTextColor(100, 100, 100)
@@ -355,14 +345,10 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 		g.pdf.Ln(2)
 	}
 
-	// Center image container
 	imgX := x + (maxWidth-containerW)/2
 
-	// Background for diagram/image container
 	g.pdf.SetFillColor(255, 255, 255)
 	if g.cfg.Colors.Background != "" {
-		// If page has background, maybe make container slightly different or keep white
-		// Let's use a very light grey if white is the background
 		g.pdf.SetFillColor(250, 250, 250)
 	}
 	g.pdf.SetDrawColor(220, 220, 220)
@@ -374,6 +360,7 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	g.pdf.Ln(2)
 }
 
+// renderList rendert eine Aufzählung oder nummerierte Liste.
 func (g *Generator) renderList(l blocks.ListBlock) {
 	g.pdf.SetFont("Main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
@@ -385,7 +372,6 @@ func (g *Generator) renderList(l blocks.ListBlock) {
 		g.pdf.SetX(15)
 		g.pdf.Write(g.cfg.FontSize/2, prefix)
 		for _, seg := range item.Content {
-			// Similar to paragraph
 			g.pdf.Write(g.cfg.FontSize/2, seg.Text)
 		}
 		g.pdf.Ln(g.cfg.FontSize/2 + 2)
@@ -393,6 +379,7 @@ func (g *Generator) renderList(l blocks.ListBlock) {
 	g.pdf.Ln(5)
 }
 
+// renderTable rendert eine Tabelle mit Kopfzeile und automatischer Spaltenbreite.
 func (g *Generator) renderTable(t blocks.TableBlock) {
 	if len(t.Rows) == 0 {
 		return
@@ -410,7 +397,6 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	g.setPrimaryTextColor()
 
 	for _, row := range t.Rows {
-		// Calculate max height for this row
 		maxH := 0.0
 		for _, cell := range row {
 			cellText := ""
@@ -422,7 +408,7 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 				maxH = h
 			}
 		}
-		maxH += 4 // Padding
+		maxH += 4
 
 		g.checkPageBreak(maxH)
 
@@ -433,7 +419,6 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 				x = left
 			}
 
-			// Background for header
 			if cell.Header {
 				g.pdf.SetFillColor(240, 240, 240)
 				g.pdf.Rect(x, y, colWidth, maxH, "F")

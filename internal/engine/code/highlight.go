@@ -1,10 +1,9 @@
+// Package code bietet Funktionen zum Syntax-Highlighting von Quellcode.
 package code
 
 import (
-	"godocgen/internal/util"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -12,11 +11,13 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
+// CustomTheme repräsentiert ein benutzerdefiniertes Chroma-Theme, das aus einer JSON-Datei geladen werden kann.
 type CustomTheme struct {
 	Name    string            `json:"name"`
 	Entries map[string]string `json:"entries"`
 }
 
+// loadCustomTheme lädt ein Theme aus einer JSON-Datei.
 func loadCustomTheme(path string) (*chroma.Style, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -32,7 +33,6 @@ func loadCustomTheme(path string) (*chroma.Style, error) {
 	for k, v := range ct.Entries {
 		tt, err := chroma.TokenTypeString(k)
 		if err != nil {
-			// Try with Background, etc.
 			if strings.EqualFold(k, "Background") {
 				tt = chroma.Background
 			} else if strings.EqualFold(k, "Text") {
@@ -52,42 +52,15 @@ func loadCustomTheme(path string) (*chroma.Style, error) {
 	return style, nil
 }
 
-func Highlight(code, lang, theme, cacheDir string) (string, error) {
-	hash := util.HashString(code + lang + theme)
-	cachePath := filepath.Join(cacheDir, "code", hash+".png")
-
-	if _, err := os.Stat(cachePath); err == nil {
-		return cachePath, nil
-	}
-
-	os.MkdirAll(filepath.Dir(cachePath), 0755)
-
-	lexer := lexers.Get(lang)
-	if lexer == nil {
-		lexer = lexers.Fallback
-	}
-	style := styles.Get(theme)
-	if style == nil {
-		style = styles.Get("github")
-	}
-
-	// We'll use a simple approach: since we can't easily render Chroma to PDF directly with all styles,
-	// we use a workaround or a simplified text rendering in the PDF engine later.
-	// But the requirement says "robuste Lösung".
-	// Chroma doesn't have a built-in PNG formatter in v2 anymore (it was in a sub-package).
-	// Let's use the text-based segments and let the PDF engine handle it, 
-	// or use a simple black & white fallback for now if it gets too complex.
-
-	// Actually, I will implement a "Block" structure where CodeBlock contains Segments (Text + Color).
-	return "", nil
-}
-
+// Segment repräsentiert einen Teil des Codes mit spezifischer Formatierung.
 type Segment struct {
-	Text  string
-	Color string // hex
-	Bold  bool
+	Text  string // Der Textinhalt
+	Color string // Hex-Farbcode
+	Bold  bool   // Fettgedruckt
 }
 
+// GetSegments zerlegt den Code in farbige Segmente basierend auf der Sprache und dem gewählten Theme.
+// Es gibt auch die Hintergrundfarbe des Themes zurück.
 func GetSegments(code, lang, theme string) ([]Segment, string, error) {
 	lexer := lexers.Get(lang)
 	if lexer == nil {
@@ -99,7 +72,6 @@ func GetSegments(code, lang, theme string) ([]Segment, string, error) {
 		var err error
 		style, err = loadCustomTheme(theme)
 		if err != nil {
-			// Fallback if file not found or invalid
 			style = styles.Get("catppuccin-latte")
 		}
 	} else {
@@ -122,9 +94,8 @@ func GetSegments(code, lang, theme string) ([]Segment, string, error) {
 			color = entry.Colour.String()
 		}
 
-		// Force comments to be grey if requested or if it's a comment
 		if token.Type.Category() == chroma.Comment {
-			color = "#888888" // Medium grey
+			color = "#888888"
 		}
 
 		segments = append(segments, Segment{
@@ -138,4 +109,3 @@ func GetSegments(code, lang, theme string) ([]Segment, string, error) {
 
 	return segments, bg, nil
 }
-

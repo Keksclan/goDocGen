@@ -9,16 +9,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// validateCmd repräsentiert den Befehl zum Validieren der Projektkonfiguration.
 var validateCmd = &cobra.Command{
 	Use:   "validate",
-	Short: "Validate project configuration",
+	Short: "Validiert die Projektkonfiguration",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgPath := filepath.Join(projectDir, "docgen.yml")
 		_, err := config.LoadConfig(cfgPath)
 		if err != nil {
-			log.Fatalf("Validation failed: %v", err)
+			log.Fatalf("Validierung fehlgeschlagen: %v", err)
 		}
-		fmt.Println("Configuration is valid.")
+		fmt.Println("Konfiguration ist gültig.")
 	},
 }
 

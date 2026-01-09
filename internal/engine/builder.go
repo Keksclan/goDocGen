@@ -1,3 +1,4 @@
+// Package engine enthält die Kernlogik zur Verarbeitung von Markdown und Erzeugung von PDFs.
 package engine
 
 import (
@@ -14,13 +15,15 @@ import (
 	"sort"
 )
 
+// Builder koordiniert den gesamten Build-Prozess eines Dokumentationsprojekts.
 type Builder struct {
-	ProjectDir string
-	OutDir     string
-	CacheDir   string
-	ConfigName string
+	ProjectDir string // Wurzelverzeichnis des Projekts
+	OutDir     string // Verzeichnis, in dem das PDF gespeichert wird
+	CacheDir   string // Verzeichnis für temporäre Dateien (Fonts, Diagramme)
+	ConfigName string // Name der Konfigurationsdatei (Standard: docgen.yml)
 }
 
+// NewBuilder erstellt eine neue Builder-Instanz mit Standardwerten.
 func NewBuilder(projectDir, outDir string) *Builder {
 	return &Builder{
 		ProjectDir: projectDir,
@@ -30,21 +33,22 @@ func NewBuilder(projectDir, outDir string) *Builder {
 	}
 }
 
-func (b *Builder) Build() error {
-	// 1. Load Config
+// Build führt den Build-Prozess aus und gibt den Pfad zur generierten PDF-Datei zurück.
+func (b *Builder) Build() (string, error) {
+	// 1. Konfiguration laden
 	cfgPath := filepath.Join(b.ProjectDir, b.ConfigName)
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		return fmt.Errorf("config error: %w", err)
+		return "", fmt.Errorf("Konfigurationsfehler: %w", err)
 	}
 
-	// 2. Extract Fonts
+	// 2. Schriften extrahieren/herunterladen
 	var fontZip string
 	if cfg.Fonts.URL != "" {
 		var err error
 		fontZip, err = fonts.DownloadFonts(cfg.Fonts.URL, b.CacheDir)
 		if err != nil {
-			return fmt.Errorf("could not download fonts: %w", err)
+			return "", fmt.Errorf("Schriften konnten nicht heruntergeladen werden: %w", err)
 		}
 	} else {
 		fontZip = filepath.Join(b.ProjectDir, cfg.Fonts.Zip)
@@ -52,10 +56,10 @@ func (b *Builder) Build() error {
 
 	fontDir, err := fonts.ExtractFonts(fontZip, b.CacheDir)
 	if err != nil {
-		return fmt.Errorf("font error: %w", err)
+		return "", fmt.Errorf("Schriftartenfehler: %w", err)
 	}
 
-	// 3. Load Markdown files (recursive)
+	// 3. Markdown-Dateien rekursiv laden
 	contentDir := filepath.Join(b.ProjectDir, "content")
 	var mdFiles []string
 	err = filepath.WalkDir(contentDir, func(path string, d os.DirEntry, err error) error {
@@ -68,7 +72,7 @@ func (b *Builder) Build() error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("could not read content dir: %w", err)
+		return "", fmt.Errorf("Content-Verzeichnis konnte nicht gelesen werden: %w", err)
 	}
 
 	sort.Strings(mdFiles)
@@ -77,46 +81,44 @@ func (b *Builder) Build() error {
 	for _, path := range mdFiles {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return "", err
 		}
 		blocks, err := markdown.Parse(data)
 		if err != nil {
-			return err
+			return "", err
 		}
 		allBlocks = append(allBlocks, blocks...)
 	}
 
-	// 4. Preprocess Blocks (Mermaid & Code)
+	// 4. Blöcke vorverarbeiten (Mermaid & Code-Highlighting)
 	for i, block := range allBlocks {
 		switch blk := block.(type) {
 		case blocks.MermaidBlock:
 			svgPath, pngPath, err := mermaid.Render(blk.Content, b.CacheDir)
 			if err != nil {
-				fmt.Printf("Warning: Could not render Mermaid diagram: %v\n", err)
+				fmt.Printf("Warnung: Mermaid-Diagramm konnte nicht gerendert werden: %v\n", err)
 				allBlocks[i] = blocks.ParagraphBlock{
 					Content: []blocks.TextSegment{
 						{Text: "[Diagramm konnte nicht gerendert werden - mmdc fehlt]", Italic: true},
 					},
 				}
 			} else {
-				// We use PNG for PDF because gofpdf has better support for it, 
-				// but we generated SVG as requested.
 				allBlocks[i] = blocks.ImageBlock{
 					Path:  pngPath,
-					Alt:   "Mermaid Diagram (SVG Source: " + svgPath + ")",
+					Alt:   "Mermaid Diagram (SVG Quelle: " + svgPath + ")",
 					Title: blk.Title,
 				}
 			}
 		case blocks.CodeBlock:
 			segments, bg, err := code.GetSegments(blk.Content, blk.Language, cfg.CodeTheme)
 			if err != nil {
-				return err
+				return "", err
 			}
 			blk.Segments = segments
 			blk.BgColor = bg
 			allBlocks[i] = blk
 		case blocks.ImageBlock:
-			// Resolve relative paths
+			// Relative Pfade auflösen
 			if !filepath.IsAbs(blk.Path) {
 				blk.Path = filepath.Join(b.ProjectDir, "assets", blk.Path)
 				allBlocks[i] = blk
@@ -124,10 +126,10 @@ func (b *Builder) Build() error {
 		}
 	}
 
-	// 5. Generate PDF with Versioning
+	// 5. PDF mit Versionierung generieren
 	baseName := cfg.Title
 	if baseName == "" {
-		baseName = "Documentation"
+		baseName = "Dokumentation"
 	}
 
 	outputPath := ""
@@ -141,7 +143,11 @@ func (b *Builder) Build() error {
 		version++
 	}
 
-	gen := pdf.NewGenerator(cfg, allBlocks, fontDir)
-	return gen.Generate(outputPath)
-}
+	// Falls das Ausgabeverzeichnis nicht existiert, erstellen
+	if err := os.MkdirAll(b.OutDir, 0755); err != nil {
+		return "", fmt.Errorf("Ausgabeverzeichnis konnte nicht erstellt werden: %w", err)
+	}
 
+	gen := pdf.NewGenerator(cfg, allBlocks, fontDir)
+	return outputPath, gen.Generate(outputPath)
+}

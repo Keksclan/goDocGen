@@ -4,6 +4,7 @@ import (
 	"strconv"
 )
 
+// hexToRGB wandelt einen Hexadezimal-Farbcode in RGB-Werte um.
 func hexToRGB(hex string) (int, int, int) {
 	if len(hex) == 7 && hex[0] == '#' {
 		hex = hex[1:]
@@ -17,11 +18,13 @@ func hexToRGB(hex string) (int, int, int) {
 	return int(r), int(g), int(b)
 }
 
+// setTextColor setzt die Textfarbe basierend auf einem Hex-Code.
 func (g *Generator) setTextColor(hex string) {
 	r, green, b := hexToRGB(hex)
 	g.pdf.SetTextColor(r, green, b)
 }
 
+// setPrimaryTextColor setzt die Standard-Textfarbe aus der Konfiguration.
 func (g *Generator) setPrimaryTextColor() {
 	if g.cfg.Colors.Text != "" {
 		g.setTextColor(g.cfg.Colors.Text)
@@ -30,11 +33,13 @@ func (g *Generator) setPrimaryTextColor() {
 	}
 }
 
+// setFillColor setzt die Füllfarbe basierend auf einem Hex-Code.
 func (g *Generator) setFillColor(hex string) {
 	r, green, b := hexToRGB(hex)
 	g.pdf.SetFillColor(r, green, b)
 }
 
+// getAlign wandelt lesbare Ausrichtungsnamen in gofpdf-Konstanten um.
 func (g *Generator) getAlign(align string) string {
 	switch align {
 	case "center":
@@ -48,6 +53,7 @@ func (g *Generator) getAlign(align string) string {
 	}
 }
 
+// checkPageBreak prüft, ob die verbleibende Höhe auf der Seite ausreicht, und fügt ggf. eine neue Seite hinzu.
 func (g *Generator) checkPageBreak(h float64) {
 	_, _, _, bottom := g.pdf.GetMargins()
 	if g.pdf.GetY()+h > 297-bottom {
@@ -55,6 +61,7 @@ func (g *Generator) checkPageBreak(h float64) {
 	}
 }
 
+// drawGradient zeichnet einen linearen Farbverlauf auf der aktuellen Seite.
 func (g *Generator) drawGradient(startColor, endColor string, orientation string) {
 	sr, sg, sb := hexToRGB(startColor)
 	er, eg, eb := hexToRGB(endColor)
@@ -71,7 +78,7 @@ func (g *Generator) drawGradient(startColor, endColor string, orientation string
 			g.pdf.Rect(float64(i)*w, 0, w+0.1, 297, "F")
 		}
 	} else {
-		// Vertical (default)
+		// Vertikal (Standard)
 		h := 297.0 / float64(steps)
 		for i := 0; i < steps; i++ {
 			ratio := float64(i) / float64(steps)

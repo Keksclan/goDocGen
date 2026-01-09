@@ -9,27 +9,30 @@ import (
 	"godocgen/internal/util"
 )
 
+// ExtractFonts entpackt ein ZIP-Archiv mit Schriftarten in ein Cache-Verzeichnis.
+// Es verwendet einen Hash des ZIP-Inhalts, um unnötiges erneutes Entpacken zu vermeiden.
 func ExtractFonts(zipPath, cacheDir string) (string, error) {
 	data, err := os.ReadFile(zipPath)
 	if err != nil {
-		return "", fmt.Errorf("could not read font zip: %w", err)
+		return "", fmt.Errorf("Font-ZIP konnte nicht gelesen werden: %w", err)
 	}
 
 	hash := util.HashBytes(data)
 	targetDir := filepath.Join(cacheDir, "fonts", hash)
 
+	// Wenn das Verzeichnis bereits existiert, wurde es bereits entpackt
 	if _, err := os.Stat(targetDir); err == nil {
 		return targetDir, nil
 	}
 
 	err = os.MkdirAll(targetDir, 0755)
 	if err != nil {
-		return "", fmt.Errorf("could not create font cache dir: %w", err)
+		return "", fmt.Errorf("Font-Cache-Verzeichnis konnte nicht erstellt werden: %w", err)
 	}
 
 	reader, err := zip.OpenReader(zipPath)
 	if err != nil {
-		return "", fmt.Errorf("could not open zip: %w", err)
+		return "", fmt.Errorf("ZIP konnte nicht geöffnet werden: %w", err)
 	}
 	defer reader.Close()
 
@@ -66,4 +69,3 @@ func ExtractFonts(zipPath, cacheDir string) (string, error) {
 
 	return targetDir, nil
 }
-

@@ -1,3 +1,4 @@
+// Package markdown bietet Funktionen zum Parsen von Markdown-Dateien in interne Dokumentblöcke.
 package markdown
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+// Parse analysiert den Markdown-Inhalt und wandelt ihn in eine Liste von DocBlocks um.
 func Parse(content []byte) ([]blocks.DocBlock, error) {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.Table),
@@ -97,7 +99,7 @@ func Parse(content []byte) ([]blocks.DocBlock, error) {
 						if c, ok := cell.(*astTable.TableCell); ok {
 							rowData = append(rowData, blocks.TableRow{
 								Content: parseTextSegments(c, content),
-								Header:  c.Alignment == astTable.AlignNone, // Simplified
+								Header:  c.Alignment == astTable.AlignNone,
 							})
 						}
 					}
@@ -112,12 +114,13 @@ func Parse(content []byte) ([]blocks.DocBlock, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("error walking markdown ast: %w", err)
+		return nil, fmt.Errorf("Fehler beim Traversieren des Markdown AST: %w", err)
 	}
 
 	return docBlocks, nil
 }
 
+// parseTextSegments extrahiert Textsegmente mit Formatierungen (fett, kursiv, code) aus einem AST-Knoten.
 func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 	var segments []blocks.TextSegment
 	isBold := false
@@ -163,4 +166,3 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 	})
 	return segments
 }
-

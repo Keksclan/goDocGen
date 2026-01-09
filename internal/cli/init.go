@@ -9,9 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// initCmd repräsentiert den Befehl zum Initialisieren eines neuen Projekts.
 var initCmd = &cobra.Command{
-	Use:   "init [path]",
-	Short: "Initialize a new documentation project",
+	Use:   "init [pfad]",
+	Short: "Initialisiert ein neues Dokumentationsprojekt",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		target := "."
@@ -21,7 +22,7 @@ var initCmd = &cobra.Command{
 
 		p := tea.NewProgram(tui.InitialInitModel(target))
 		if _, err := p.Run(); err != nil {
-			log.Fatalf("TUI error: %v", err)
+			log.Fatalf("TUI-Fehler: %v", err)
 		}
 	},
 }
@@ -29,4 +30,3 @@ var initCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(initCmd)
 }
-

@@ -1,3 +1,4 @@
+// Package pdf implementiert die PDF-Generierung unter Verwendung von gofpdf.
 package pdf
 
 import (
@@ -10,25 +11,29 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
+// Generator ist die zentrale Komponente zur Erzeugung des PDF-Dokuments.
 type Generator struct {
-	pdf             *gofpdf.Fpdf
-	cfg             *config.Config
-	blocks          []blocks.DocBlock
-	toc             []TOCEntry
-	fontDir         string
-	totalPages      int
-	headingCounts   []int
-	registeredFonts map[string]bool
+	pdf             *gofpdf.Fpdf      // Die zugrunde liegende PDF-Bibliothek
+	cfg             *config.Config    // Die Projektkonfiguration
+	blocks          []blocks.DocBlock // Die zu rendernden Inhaltsblöcke
+	toc             []TOCEntry        // Gesammelte Inhaltsverzeichniseinträge
+	fontDir         string            // Verzeichnis der extrahierten Schriftarten
+	totalPages      int               // Gesamtanzahl der Seiten (nach Pass 1)
+	headingCounts   []int             // Zähler für die Nummerierung von Überschriften
+	registeredFonts map[string]bool   // Verfolgt bereits registrierte Schriftarten
+	inTOC           bool              // Status, ob gerade das Inhaltsverzeichnis gerendert wird
 }
 
+// TOCEntry repräsentiert einen Eintrag im Inhaltsverzeichnis.
 type TOCEntry struct {
-	Level  int
-	Number string
-	Text   string
-	Page   int
-	Link   int
+	Level  int    // Ebene der Überschrift (1-6)
+	Number string // Hierarchische Nummer (z.B. 1.2.3)
+	Text   string // Text der Überschrift
+	Page   int    // Seitenzahl
+	Link   int    // Interner PDF-Link zur Zielseite
 }
 
+// NewGenerator erstellt einen neuen PDF-Generator.
 func NewGenerator(cfg *config.Config, blocks []blocks.DocBlock, fontDir string) *Generator {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(cfg.Layout.Margins.Left, cfg.Layout.Margins.Top, cfg.Layout.Margins.Right)
@@ -43,19 +48,20 @@ func NewGenerator(cfg *config.Config, blocks []blocks.DocBlock, fontDir string) 
 		registeredFonts: make(map[string]bool),
 	}
 
-	// Register Fonts
+	// Schriften beim Initialisieren registrieren
 	g.registerFonts(fontDir)
 
 	return g
 }
 
+// registerFonts registriert die im Projekt definierten Schriften in der PDF-Bibliothek.
 func (g *Generator) registerFonts(fontDir string) {
 	regularPath := filepath.Join(fontDir, g.cfg.Fonts.Regular)
 	if _, err := os.Stat(regularPath); err == nil {
 		g.pdf.AddUTF8Font("Main", "", regularPath)
 		g.registeredFonts["Main"] = true
 	} else {
-		fmt.Printf("Warning: Regular font not found at %s.\n", regularPath)
+		fmt.Printf("Warnung: Normale Schriftart nicht unter %s gefunden.\n", regularPath)
 	}
 
 	if g.cfg.Fonts.Bold != "" {
@@ -117,13 +123,14 @@ func (g *Generator) registerFonts(fontDir string) {
 	}
 }
 
+// Generate führt den zweistufigen Rendering-Prozess aus und speichert das Ergebnis.
 func (g *Generator) Generate(outputPath string) error {
-	// Pass 1: Measure and collect TOC
+	// Durchgang 1: Messen und Sammeln des Inhaltsverzeichnisses
 	g.headingCounts = make([]int, 6)
 	g.renderAll(true)
 	g.totalPages = g.pdf.PageNo()
 
-	// Reset for Pass 2
+	// Zurücksetzen für Durchgang 2
 	g.pdf = gofpdf.New("P", "mm", "A4", "")
 	g.pdf.SetMargins(g.cfg.Layout.Margins.Left, g.cfg.Layout.Margins.Top, g.cfg.Layout.Margins.Right)
 	g.pdf.SetAutoPageBreak(true, g.cfg.Layout.Margins.Bottom)
@@ -131,7 +138,7 @@ func (g *Generator) Generate(outputPath string) error {
 	g.registerFonts(g.fontDir)
 	g.headingCounts = make([]int, 6)
 
-	// Pass 2: Final render
+	// Durchgang 2: Finales Rendern
 	g.renderAll(false)
 
 	err := os.MkdirAll(filepath.Dir(outputPath), 0755)
@@ -142,21 +149,19 @@ func (g *Generator) Generate(outputPath string) error {
 	return g.pdf.OutputFileAndClose(outputPath)
 }
 
+// renderAll steuert das Rendern aller Dokumententeile.
 func (g *Generator) renderAll(isMeasurement bool) {
 	g.setupHeaderFooter()
 
-	// Front Page
+	// Titelseite
 	g.renderFrontPage()
 
-	// TOC Page
-	if !isMeasurement {
-		g.renderTOC()
-	} else {
-		// Just a placeholder to count pages
-		g.pdf.AddPage()
+	// Inhaltsverzeichnis
+	if g.cfg.TOC.Enabled {
+		g.renderTOC(isMeasurement)
 	}
 
-	// Content
+	// Inhalt (Blöcke)
 	for _, block := range g.blocks {
 		g.renderBlock(block, isMeasurement)
 	}

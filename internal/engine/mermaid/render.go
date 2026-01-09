@@ -1,3 +1,4 @@
+// Package mermaid bietet Funktionen zum Rendern von Mermaid-Diagrammen in SVG und PNG.
 package mermaid
 
 import (
@@ -11,11 +12,14 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// Render versucht ein Mermaid-Diagramm zu rendern.
+// Es nutzt mmdc (Mermaid CLI), falls installiert, ansonsten erfolgt ein Fallback auf ChromeDP.
 func Render(content string, cacheDir string) (string, string, error) {
 	hash := util.HashString(content)
 	svgPath := filepath.Join(cacheDir, "mermaid", hash+".svg")
 	pngPath := filepath.Join(cacheDir, "mermaid", hash+".png")
 
+	// Cache-Prüfung
 	if _, err := os.Stat(svgPath); err == nil {
 		if _, err := os.Stat(pngPath); err == nil {
 			return svgPath, pngPath, nil
@@ -24,23 +28,24 @@ func Render(content string, cacheDir string) (string, string, error) {
 
 	os.MkdirAll(filepath.Dir(svgPath), 0755)
 
-	// Try mmdc first
+	// Versuche mmdc (schneller und bessere Qualität)
 	err := renderWithMmdc(content, svgPath, pngPath)
 	if err == nil {
 		return svgPath, pngPath, nil
 	}
 
-	// Fallback to ChromeDP
-	fmt.Printf("Warning: mmdc failed or not found, falling back to ChromeDP for Mermaid: %v\n", err)
+	// Fallback auf ChromeDP (benötigt installierten Chrome/Chromium)
+	fmt.Printf("Warnung: mmdc fehlgeschlagen oder nicht installiert, nutze ChromeDP für Mermaid: %v\n", err)
 	err = renderWithChrome(content, pngPath)
 	if err != nil {
-		return "", "", fmt.Errorf("mermaid rendering failed (mmdc and chromedp): %w", err)
+		return "", "", fmt.Errorf("Mermaid-Rendering fehlgeschlagen (mmdc und chromedp): %w", err)
 	}
 
-	// We don't have SVG from ChromeDP easily, so we just return the same path for both or empty SVG
+	// ChromeDP liefert nur PNG, wir nutzen es für beide Pfade als Fallback
 	return pngPath, pngPath, nil
 }
 
+// renderWithMmdc nutzt die Mermaid CLI (mmdc) zum Rendern.
 func renderWithMmdc(content string, svgPath, pngPath string) error {
 	hash := util.HashString(content)
 	tmpFile := filepath.Join(os.TempDir(), hash+".mmd")
@@ -59,6 +64,7 @@ func renderWithMmdc(content string, svgPath, pngPath string) error {
 	return err
 }
 
+// renderWithChrome nutzt einen headless Browser (via ChromeDP) zum Rendern.
 func renderWithChrome(content string, outputPath string) error {
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -92,7 +98,6 @@ func renderWithChrome(content string, outputPath string) error {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
-	// Set timeout
 	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -100,7 +105,6 @@ func renderWithChrome(content string, outputPath string) error {
 	err := chromedp.Run(ctx,
 		chromedp.Navigate("file://"+tmpFile),
 		chromedp.WaitVisible(".mermaid svg", chromedp.ByQuery),
-		// Give it a moment to stabilize
 		chromedp.Sleep(500*time.Millisecond),
 		chromedp.Screenshot("#container", &buf, chromedp.ByID),
 	)
@@ -110,4 +114,3 @@ func renderWithChrome(content string, outputPath string) error {
 
 	return os.WriteFile(outputPath, buf, 0644)
 }
-

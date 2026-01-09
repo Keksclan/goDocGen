@@ -8,7 +8,7 @@ goDocGen ist ein CLI-Tool zur Erzeugung professioneller PDF-Dokumentation aus Ma
 - 📊 **Erweiterte Mermaid Integration**: Flussdiagramme, Sequenzdiagramme, Klassendiagramme und State-Diagramme.
 - 🎨 **Corporate Identity**: Volle Kontrolle über Farben, Schriftarten und Layouts (Default: Catppuccin Theme).
 - 💻 **Modernes Code Rendering**: Syntax-Highlighting im IDE-Stil mit abgerundeten Containern und Sprach-Indikatoren.
-- 🖱️ **Interaktives TUI**: Starten Sie das Interface mit `godocgen tui` für Erklärungen und Aktionen.
+- 🖱️ **Interaktives TUI**: Starten Sie das Interface mit `godocgen tui`. Es merkt sich zuletzt geöffnete Projekte für schnellen Zugriff.
 - ⏬ **Font Downloader**: Laden Sie Schriftarten direkt via URL in der Konfiguration.
 - 📑 **Interaktive Navigation**: Automatische Inhaltsverzeichnisse mit klickbaren Links zu den Kapiteln.
 - 📁 **Hierarchische Struktur**: Ordnerbasierte Organisation des Contents wird automatisch in die Dokumentenstruktur übernommen.
@@ -78,6 +78,91 @@ my-docs/
 ├── content/        # Markdown Dateien (verschachtelte Ordner möglich)
 ├── assets/         # Bilder & Grafiken
 └── fonts/          # ZIP mit TTF-Dateien (Arial, Courier, etc.)
+```
+
+## Konfiguration (docgen.yml)
+
+Die `docgen.yml` steuert das gesamte Erscheinungsbild Ihres Dokuments. Hier ist eine Übersicht aller verfügbaren Optionen:
+
+### Basis-Informationen
+- `title`: Der Haupttitel des Dokuments (erscheint auf dem Deckblatt).
+- `subtitle`: Ein Untertitel für das Deckblatt.
+- `author`: Name des Autors.
+
+### Layout & Abstände
+- `font_size`: Standard-Schriftgröße für den Fließtext (z.B. `12`).
+- `layout`:
+  - `startpage`: Ausrichtung des Titels (`left`, `center`, `right`, `justify`).
+  - `body`: Standard-Textausrichtung (`left`, `center`, `right`, `justify`).
+  - `margins`: Seitenränder in mm (`left`, `right`, `top`, `bottom`).
+- `page_numbers`:
+  - `start_page`: Die physische Seite, ab der die Seitennummerierung im Footer beginnt (z.B. `3`).
+
+### Farben & Design
+- `colors`:
+  - `title`: Hex-Farbe für Überschriften (z.B. `#1e66f5`).
+  - `header`: Hex-Farbe für den Header-Text.
+  - `text`: Standard-Textfarbe.
+  - `background`: Hintergrundfarbe der Seiten.
+  - `accent`: Farbe für Akzent-Elemente (z.B. die Linie vor H1).
+- `gradient`:
+  - `enabled`: `true` um einen Farbverlauf zu aktivieren.
+  - `start` / `end`: Start- und Endfarbe des Verlaufs (Hex).
+  - `orientation`: `vertical` oder `horizontal`.
+  - `global`: `true` um den Verlauf auf allen Seiten anzuzeigen, `false` nur für das Deckblatt.
+
+### Header & Footer
+- `header` / `footer`:
+  - `text`: Der anzuzeigende Text (für Footer veraltet, nutze `left`/`center`/`right`).
+  - `image`: Pfad zu einem Bild (Logo), das im Header/Footer angezeigt werden soll.
+  - `left` / `center` / `right`: Definieren Sie den Inhalt für die drei Zonen im Footer. Unterstützt Platzhalter: `{page}`, `{total}`, `{title}`, `{author}`, `{date}`.
+
+### Schriften (Fonts)
+- `fonts`:
+  - `zip`: Pfad zu einem ZIP-Archiv, das die `.ttf` Dateien enthält.
+  - `url`: Alternativ eine URL zum Download eines Font-Zips.
+  - `regular`: Dateiname der normalen Schriftart (muss im ZIP sein).
+  - `bold`: Dateiname der fettgedruckten Variante.
+  - `italic`: Dateiname der kursiven Variante.
+  - `mono`: Dateiname der Monospace-Schriftart für Code.
+
+### Diagramme & Code
+- `code_theme`: Name des Chroma-Highlights Themes (z.B. `github`, `monokai`, `catppuccin-mocha`).
+- `mermaid`:
+  - `renderer`: `mmdc` (nutzt mermaid-cli) oder leer lassen für den automatischen Chrome-Fallback.
+
+### Beispiel Konfiguration
+
+```yaml
+title: "System-Architektur 2026"
+subtitle: "Interne Dokumentation v2"
+author: "Max Mustermann"
+
+font_size: 11
+
+colors:
+  title: "#1e66f5"
+  accent: "#f38ba8"
+  text: "#4c4f69"
+
+fonts:
+  zip: "fonts/fonts.zip"
+  regular: "Inter-Regular.ttf"
+  bold: "Inter-Bold.ttf"
+  mono: "JetBrainsMono-Regular.ttf"
+
+page_numbers:
+  start_page: 2
+
+layout:
+  body: "justify"
+  margins:
+    left: 20
+    right: 20
+    top: 20
+    bottom: 20
+
+code_theme: "catppuccin-latte"
 ```
 
 ## Lizenz
