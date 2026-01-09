@@ -14,3 +14,7 @@ layout:
     right: 20
     top: 20
     bottom: 20
+toc:
+  enabled: true
+  show_numbers: true
+  show_dots: true

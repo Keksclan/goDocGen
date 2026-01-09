@@ -20,24 +20,30 @@ func getEntryHeight(level int, scale float64) float64 {
 }
 
 // renderTOC rendert das Inhaltsverzeichnis mit klickbaren Links und Seitenzahlen.
-func (g *Generator) renderTOC(isMeasurement bool) {
+// Im Measurement-Modus gibt es die Anzahl der benötigten Seiten zurück.
+func (g *Generator) renderTOC(isMeasurement bool) int {
 	if !g.cfg.TOC.Enabled {
-		return
+		return 0
 	}
 
+	startPage := g.pdf.PageNo()
 	g.inTOC = true
 	g.pdf.AddPage()
 	g.inTOC = false
 
 	if isMeasurement {
-		// Im ersten Durchgang messen wir nur, wie viele Seiten das TOC einnimmt
-		// Wir simulieren das Rendern der Einträge
+		if len(g.toc) == 0 {
+			// Falls noch keine Einträge da sind (erster Lauf), reservieren wir eine Seite
+			g.pdf.AddPage()
+			return g.pdf.PageNo() - startPage
+		}
+
+		// Im ersten Durchgang messen wir, wie viele Seiten das TOC tatsächlich einnimmt
 		g.pdf.SetY(40)
 		g.pdf.Ln(15) // Titel
 		g.pdf.Ln(10) // Linie
 
 		for _, entry := range g.toc {
-			// Wir nutzen eine vereinfachte Höhenberechnung
 			h := 10.0
 			if entry.Level == 1 {
 				h = 12.0
@@ -46,7 +52,7 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 			g.pdf.Ln(h)
 		}
 		g.pdf.AddPage()
-		return
+		return g.pdf.PageNo() - startPage
 	}
 
 	// Titel des Inhaltsverzeichnisses
@@ -119,4 +125,39 @@ func (g *Generator) renderTOC(isMeasurement bool) {
 
 	// Sicherstellen, dass der nächste Inhalt auf einer neuen Seite beginnt
 	g.pdf.AddPage()
+	return g.pdf.PageNo() - startPage
+}
+
+// measureTOC berechnet die Anzahl der Seiten, die das Inhaltsverzeichnis einnehmen wird,
+// ohne das eigentliche PDF-Dokument zu verändern.
+func (g *Generator) measureTOC() int {
+	if !g.cfg.TOC.Enabled || len(g.toc) == 0 {
+		return 0
+	}
+
+	_, top, _, bottom := g.pdf.GetMargins()
+	pageHeight := 297.0
+	usableHeight := pageHeight - top - bottom
+
+	currentY := 40.0 // Start Y laut renderTOC
+	currentY += 15.0 // Titel Höhe
+	currentY += 10.0 // Linie und Abstand
+
+	pages := 1
+	for _, entry := range g.toc {
+		h := 11.0
+		if entry.Level == 1 {
+			h = 12.0
+			currentY += 2.0 // Extra-Abstand für Top-Level laut renderTOC
+		}
+
+		// checkPageBreak Logik simulieren
+		if currentY+h > usableHeight+top-10 { // -10 als Sicherheitspuffer
+			pages++
+			currentY = top + 20.0 // Neue Seite
+		}
+		currentY += h
+	}
+
+	return pages
 }

@@ -14,7 +14,7 @@ import (
 )
 
 // Parse analysiert den Markdown-Inhalt und wandelt ihn in eine Liste von DocBlocks um.
-func Parse(content []byte) ([]blocks.DocBlock, error) {
+func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.Table),
 	)
@@ -31,8 +31,9 @@ func Parse(content []byte) ([]blocks.DocBlock, error) {
 		switch node := n.(type) {
 		case *ast.Heading:
 			docBlocks = append(docBlocks, blocks.HeadingBlock{
-				Level: node.Level,
-				Text:  string(node.Text(content)),
+				Level:           node.Level,
+				Text:            string(node.Text(content)),
+				ParentNumbering: parentNumbering,
 			})
 			return ast.WalkSkipChildren, nil
 		case *ast.Paragraph:

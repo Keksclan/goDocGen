@@ -57,24 +57,63 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 
 	numbering := ""
 	if g.cfg.Layout.HeaderNumbering {
-		for i := 0; i < h.Level; i++ {
-			count := g.headingCounts[i]
-			if count == 0 {
-				count = 1
+		if h.ParentNumbering != "" {
+			// Verwende die Nummerierung aus der Ordnerstruktur
+			// Diese wird für Überschriften innerhalb der Datei erweitert
+			numbering = h.ParentNumbering
+
+			// Für jede Überschriften-Ebene hängen wir den aktuellen Zähler an
+			for i := 0; i < h.Level; i++ {
+				count := g.headingCounts[i]
+				if count == 0 {
+					count = 1
+				}
+				// Wir verwenden Punkte für die Hierarchie (1.1.1)
+				if !strings.HasSuffix(numbering, ".") && numbering != "" {
+					numbering += "."
+				}
+				numbering += fmt.Sprintf("%d", count)
 			}
-			numbering += fmt.Sprintf("%d.", count)
+			if numbering != "" && !strings.HasSuffix(numbering, ".") {
+				numbering += "."
+			}
+		} else {
+			// Klassische hierarchische Nummerierung
+			for i := 0; i < h.Level; i++ {
+				count := g.headingCounts[i]
+				if count == 0 {
+					count = 1
+				}
+				numbering += fmt.Sprintf("%d.", count)
+			}
 		}
+
 		if numbering != "" {
 			numbering += " "
 		}
 	}
 
+	text := h.Text
+	if numbering != "" {
+		// Falls im Markdown-Text bereits eine Nummerierung vorhanden ist (z.B. "1. Einleitung"),
+		// entfernen wir diese, um doppelte Nummern zu vermeiden.
+		text = trimLeadingNumbering(text)
+	}
+
 	link := g.pdf.AddLink()
 	if isMeasurement {
+		// Berechne globales Level für korrekte Einrückung im TOC
+		globalLevel := h.Level
+		if h.ParentNumbering != "" {
+			// Zähle Punkte in ParentNumbering für die Basistiefe
+			dots := strings.Count(h.ParentNumbering, ".")
+			globalLevel += dots
+		}
+
 		g.toc = append(g.toc, TOCEntry{
-			Level:  h.Level,
+			Level:  globalLevel,
 			Number: numbering,
-			Text:   h.Text,
+			Text:   text,
 			Page:   g.pdf.PageNo(),
 			Link:   link,
 		})
@@ -110,10 +149,34 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 		g.pdf.SetX(left + 5)
 	}
 
-	displayText := numbering + h.Text
+	displayText := numbering + text
 	align := g.getAlign(g.cfg.Layout.Body)
 	g.pdf.MultiCell(0, 10, displayText, "", align, false)
 	g.pdf.Ln(3)
+}
+
+// trimLeadingNumbering entfernt führende Nummern wie "1. ", "1.1 " oder "1) " aus einem String.
+func trimLeadingNumbering(s string) string {
+	s = strings.TrimSpace(s)
+	// Wir suchen nach einem Muster am Anfang: Zahlen, Punkte, Leerzeichen
+	i := 0
+	foundDigit := false
+	for i < len(s) {
+		r := s[i]
+		if r >= '0' && r <= '9' {
+			foundDigit = true
+			i++
+		} else if r == '.' || r == ')' || r == ' ' || r == '\t' {
+			i++
+		} else {
+			break
+		}
+	}
+
+	if foundDigit && i < len(s) {
+		return strings.TrimSpace(s[i:])
+	}
+	return s
 }
 
 // safeWrite schreibt Text sicher in das PDF und fängt Panics der PDF-Bibliothek ab.

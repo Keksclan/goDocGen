@@ -181,13 +181,28 @@ func (g *Generator) renderAll(isMeasurement bool) {
 	// Titelseite
 	g.renderFrontPage()
 
+	tocPages := 0
 	// Inhaltsverzeichnis
 	if g.cfg.TOC.Enabled {
-		g.renderTOC(isMeasurement)
+		tocPages = g.renderTOC(isMeasurement)
 	}
 
 	// Inhalt (Blöcke)
 	for _, block := range g.blocks {
 		g.renderBlock(block, isMeasurement)
+	}
+
+	// Wenn wir im Mess-Durchgang sind, korrigieren wir nun die Seitenzahlen im TOC,
+	// falls das TOC mehr als eine Seite (den initialen Platzhalter) beansprucht.
+	if isMeasurement && g.cfg.TOC.Enabled && tocPages > 0 {
+		// Im ersten Durchgang von renderTOC wurde g.toc erst gefüllt, nachdem renderTOC gerufen wurde.
+		// Daher müssen wir das TOC jetzt, wo g.toc voll ist, nochmals virtuell messen.
+		actualTOCPages := g.measureTOC()
+		offset := actualTOCPages - tocPages
+		if offset != 0 {
+			for i := range g.toc {
+				g.toc[i].Page += offset
+			}
+		}
 	}
 }

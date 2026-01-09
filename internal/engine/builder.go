@@ -12,8 +12,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
 )
+
+type numberedFile struct {
+	path      string
+	numbering string
+}
 
 // Builder koordiniert den gesamten Build-Prozess eines Dokumentationsprojekts.
 type Builder struct {
@@ -66,44 +71,24 @@ func (b *Builder) Build() (string, error) {
 		fontDir = b.ProjectDir
 	}
 
-	// 3. Markdown-Dateien rekursiv laden
+	// 3. Markdown-Dateien rekursiv laden mit Nummerierung basierend auf Ordnerstruktur
 	contentDir := filepath.Join(b.ProjectDir, "content")
-	var mdFiles []string
-	err = filepath.WalkDir(contentDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() && filepath.Ext(path) == ".md" {
-			mdFiles = append(mdFiles, path)
-		}
-		return nil
-	})
+	numberedFiles, err := b.scanContent(contentDir, "", 0)
 	if err != nil {
 		return "", fmt.Errorf("Content-Verzeichnis konnte nicht gelesen werden: %w", err)
 	}
 
-	sort.Slice(mdFiles, func(i, j int) bool {
-		// Sortiere primär nach Dateiname, ignoriere Ordnerstruktur für die Reihenfolge
-		// falls Dateinamen gleich sind, nimm den vollen Pfad als Fallback
-		baseI := filepath.Base(mdFiles[i])
-		baseJ := filepath.Base(mdFiles[j])
-		if baseI != baseJ {
-			return baseI < baseJ
-		}
-		return mdFiles[i] < mdFiles[j]
-	})
-
 	var allBlocks []blocks.DocBlock
-	for _, path := range mdFiles {
-		data, err := os.ReadFile(path)
+	for _, nf := range numberedFiles {
+		data, err := os.ReadFile(nf.path)
 		if err != nil {
 			return "", err
 		}
-		blocks, err := markdown.Parse(data)
+		blks, err := markdown.Parse(data, nf.numbering)
 		if err != nil {
 			return "", err
 		}
-		allBlocks = append(allBlocks, blocks...)
+		allBlocks = append(allBlocks, blks...)
 	}
 
 	// 4. Blöcke vorverarbeiten (Mermaid & Code-Highlighting)
@@ -166,4 +151,72 @@ func (b *Builder) Build() (string, error) {
 
 	gen := pdf.NewGenerator(cfg, allBlocks, fontDir)
 	return outputPath, gen.Generate(outputPath)
+}
+
+// scanContent durchläuft ein Verzeichnis rekursiv und weist jeder MD-Datei eine Nummer basierend auf der Hierarchie zu.
+func (b *Builder) scanContent(dir string, parentNum string, level int) ([]numberedFile, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var files []numberedFile
+	relevantIndex := 1
+	for _, entry := range entries {
+		name := entry.Name()
+		// Ignoriere versteckte Dateien und spezielle Ordner
+		if strings.HasPrefix(name, ".") || name == "dist" || name == "assets" || name == "fonts" {
+			continue
+		}
+
+		fullPath := filepath.Join(dir, name)
+
+		// Prüfen, ob der Eintrag relevant ist (MD-Datei oder Ordner mit MD-Dateien)
+		isMD := !entry.IsDir() && filepath.Ext(name) == ".md"
+		hasMD := false
+		if entry.IsDir() {
+			err := filepath.WalkDir(fullPath, func(path string, d os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !d.IsDir() && filepath.Ext(path) == ".md" {
+					hasMD = true
+					return filepath.SkipAll
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if !isMD && !hasMD {
+			continue
+		}
+
+		num := ""
+		if level == 0 {
+			num = fmt.Sprintf("%d.", relevantIndex)
+		} else {
+			num = fmt.Sprintf("%s_%d", strings.TrimSuffix(parentNum, "."), relevantIndex)
+		}
+
+		if entry.IsDir() {
+			subFiles, err := b.scanContent(fullPath, num, level+1)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, subFiles...)
+		} else {
+			files = append(files, numberedFile{
+				path:      fullPath,
+				numbering: num,
+			})
+		}
+		relevantIndex++
+	}
+	return files, nil
 }

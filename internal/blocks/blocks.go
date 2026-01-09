@@ -10,8 +10,9 @@ type DocBlock interface {
 
 // HeadingBlock repräsentiert eine Überschrift.
 type HeadingBlock struct {
-	Level int    // Ebene der Überschrift (1-6)
-	Text  string // Textinhalt
+	Level           int    // Ebene der Überschrift (1-6)
+	Text            string // Textinhalt
+	ParentNumbering string // Basis-Nummerierung aus der Ordnerstruktur (z.B. "1.1_")
 }
 
 func (h HeadingBlock) IsBlock() {}
