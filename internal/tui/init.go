@@ -99,7 +99,7 @@ func (m InitModel) finishInit() tea.Cmd {
 		titleColor := "#89b4fa"
 		fontSize := 12.0
 		lineSpacing := 1.0
-		marginLeft, marginRight, marginTop, marginBottom := 10.0, 10.0, 10.0, 10.0
+		marginLeft, marginRight, marginTop, marginBottom := 25.0, 25.0, 20.0, 20.0
 
 		switch m.cursor {
 		case 1:

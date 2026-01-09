@@ -189,7 +189,7 @@ func GetThemeColors(theme string) Colors {
 	}
 }
 
-// GetAvailableThemes gibt eine Liste aller eingebauten Themes zurück.
+// GetAvailableThemes gibt eine Liste aller eingebauten App-Themes zurück.
 func GetAvailableThemes() []string {
 	return []string{
 		"catppuccin-mocha",
@@ -207,6 +207,30 @@ func GetAvailableThemes() []string {
 		"one-light",
 		"nord-light",
 		"red-white",
+	}
+}
+
+// GetAvailableCodeThemes gibt eine Liste von populären Chroma-Syntax-Highlighting Themes zurück.
+func GetAvailableCodeThemes() []string {
+	return []string{
+		"catppuccin-mocha",
+		"catppuccin-latte",
+		"github",
+		"github-dark",
+		"monokai",
+		"monokailight",
+		"dracula",
+		"pygments",
+		"tango",
+		"solarized-dark",
+		"solarized-light",
+		"nord",
+		"onesenterprise",
+		"perldoc",
+		"swapoff",
+		"vim",
+		"fruity",
+		"base16-snazzy",
 	}
 }
 
@@ -231,10 +255,10 @@ func setDefaults(cfg *Config) {
 	cfg.Layout.HeaderNumbering = true
 
 	if cfg.Layout.Margins.Left == 0 {
-		cfg.Layout.Margins.Left = 10
+		cfg.Layout.Margins.Left = 25
 	}
 	if cfg.Layout.Margins.Right == 0 {
-		cfg.Layout.Margins.Right = 10
+		cfg.Layout.Margins.Right = 25
 	}
 	if cfg.Layout.Margins.Top == 0 {
 		cfg.Layout.Margins.Top = 10

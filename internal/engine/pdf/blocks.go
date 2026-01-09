@@ -39,10 +39,13 @@ func (g *Generator) safeSetFont(family string, style string, size float64) {
 
 	if g.registeredFonts[key] {
 		g.pdf.SetFont(family, style, size)
+		g.currentFontIsUTF8 = true
 	} else if g.registeredFonts["main"] {
 		g.pdf.SetFont("main", "", size)
+		g.currentFontIsUTF8 = true
 	} else {
 		g.pdf.SetFont("Arial", style, size)
+		g.currentFontIsUTF8 = false
 	}
 }
 
@@ -158,7 +161,7 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 
 	displayText := numbering + text
 	align := g.getAlign(g.cfg.Layout.Body)
-	g.pdf.MultiCell(0, 10, displayText, "", align, false)
+	g.pdf.MultiCell(0, 10, g.prepareText(displayText), "", align, false)
 	g.pdf.Ln(3)
 }
 
@@ -195,26 +198,12 @@ func trimLeadingNumbering(s string) string {
 }
 
 // safeWrite schreibt Text sicher in das PDF und fängt Panics der PDF-Bibliothek ab.
-func (g *Generator) safeWrite(size float64, text string, family string, style string) {
+func (g *Generator) safeWrite(size float64, text string, family string, style string, link string) {
 	if text == "" {
 		return
 	}
 
-	family = strings.ToLower(family)
-	key := family
-	if style != "" {
-		key = family + style
-	}
-
-	if !g.registeredFonts[key] {
-		if g.registeredFonts["main"] {
-			g.pdf.SetFont("main", "", g.cfg.FontSize)
-		} else {
-			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
-		}
-	} else {
-		g.pdf.SetFont(family, style, g.cfg.FontSize)
-	}
+	g.safeSetFont(family, style, g.cfg.FontSize)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -222,7 +211,11 @@ func (g *Generator) safeWrite(size float64, text string, family string, style st
 		}
 	}()
 
-	g.pdf.Write(size, text)
+	if link != "" {
+		g.pdf.WriteLinkString(size, g.prepareText(text), link)
+	} else {
+		g.pdf.Write(size, g.prepareText(text))
+	}
 }
 
 // safeWriteLinkID schreibt einen klickbaren Link sicher in das PDF.
@@ -231,21 +224,7 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 		return
 	}
 
-	family = strings.ToLower(family)
-	key := family
-	if style != "" {
-		key = family + style
-	}
-
-	if !g.registeredFonts[key] {
-		if g.registeredFonts["main"] {
-			g.pdf.SetFont("main", "", g.cfg.FontSize)
-		} else {
-			g.pdf.SetFont("Arial", style, g.cfg.FontSize)
-		}
-	} else {
-		g.pdf.SetFont(family, style, g.cfg.FontSize)
-	}
+	g.safeSetFont(family, style, g.cfg.FontSize)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -253,7 +232,7 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 		}
 	}()
 
-	g.pdf.WriteLinkID(size, text, link)
+	g.pdf.WriteLinkID(size, g.prepareText(text), link)
 }
 
 // getLineHeight berechnet die Zeilenhöhe basierend auf Schriftgröße und konfiguriertem Zeilenabstand.
@@ -290,15 +269,15 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 			if g.cfg.Fonts.Mono != "" {
 				fontFamily = "mono"
 			}
-			g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
+			g.safeSetFont(fontFamily, "", g.cfg.FontSize)
 			g.pdf.SetFillColor(240, 240, 240)
 			if seg.Text != "" {
-				g.safeWrite(lineHeight, seg.Text, fontFamily, "I")
+				g.safeWrite(lineHeight, seg.Text, fontFamily, "", seg.Link)
 			}
 		} else {
 			g.safeSetFont("main", style, g.cfg.FontSize)
 			if seg.Text != "" {
-				g.safeWrite(lineHeight, seg.Text, "main", style)
+				g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
 			}
 		}
 	}
@@ -312,7 +291,7 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 		fontFamily = "mono"
 	}
 
-	g.safeSetFont(fontFamily, "I", g.cfg.FontSize)
+	g.safeSetFont(fontFamily, "", g.cfg.FontSize)
 	bgR, bgG, bgB := 245, 245, 245
 	if c.BgColor != "" {
 		r, green, b := hexToRGB(c.BgColor)
@@ -345,7 +324,8 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 	x := g.pdf.GetX()
 	y := g.pdf.GetY()
 	left, _, right, _ := g.pdf.GetMargins()
-	width := 210 - left - right
+	w, _ := g.pdf.GetPageSize()
+	width := w - left - right
 
 	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF")
 
@@ -354,7 +334,7 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 		g.pdf.SetTextColor(150, 150, 150)
 		labelW := g.pdf.GetStringWidth(c.Language) + 4
 		g.pdf.SetXY(x+width-labelW-2, y+2)
-		g.pdf.CellFormat(labelW, 4, c.Language, "", 0, "R", false, 0, "")
+		g.pdf.CellFormat(labelW, 4, g.prepareText(c.Language), "", 0, "R", false, 0, "")
 	}
 
 	g.pdf.SetX(x + 5)
@@ -380,13 +360,13 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 
 			if idx == -1 {
 				if text != "" {
-					g.safeWrite(lineHeight, text, fontFamily, "I")
+					g.safeWrite(lineHeight, text, fontFamily, "", "")
 				}
 				break
 			}
 
 			if idx > 0 {
-				g.safeWrite(lineHeight, text[:idx], fontFamily, "I")
+				g.safeWrite(lineHeight, text[:idx], fontFamily, "", "")
 			}
 			g.pdf.Ln(lineHeight)
 			g.pdf.SetX(x + 5)
@@ -405,8 +385,9 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	g.pdf.RegisterImage(i.Path, "")
 	info := g.pdf.GetImageInfo(i.Path)
 	left, top, right, bottom := g.pdf.GetMargins()
-	maxWidth := 210 - left - right
-	maxPageHeight := 297 - top - bottom - 40
+	w, h_page := g.pdf.GetPageSize()
+	maxWidth := w - left - right
+	maxPageHeight := h_page - top - bottom - 40
 
 	widthOnPage := maxWidth - 20
 	var h float64
@@ -442,7 +423,7 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	if i.Title != "" {
 		g.safeSetFont("main", "B", 10)
 		g.pdf.SetTextColor(100, 100, 100)
-		g.pdf.CellFormat(0, 8, i.Title, "", 1, "C", false, 0, "")
+		g.pdf.CellFormat(0, 8, g.prepareText(i.Title), "", 1, "C", false, 0, "")
 		g.pdf.Ln(2)
 	}
 
@@ -473,7 +454,7 @@ func (g *Generator) renderList(l blocks.ListBlock) {
 			prefix = fmt.Sprintf("%d. ", i+1)
 		}
 		g.pdf.SetX(15)
-		g.pdf.Write(lineHeight, prefix)
+		g.pdf.Write(lineHeight, g.prepareText(prefix))
 		for _, seg := range item.Content {
 			style := ""
 			if seg.Bold {
@@ -482,8 +463,8 @@ func (g *Generator) renderList(l blocks.ListBlock) {
 			if seg.Italic {
 				style += "I"
 			}
-			g.safeSetFont("Main", style, g.cfg.FontSize)
-			g.safeWrite(lineHeight, seg.Text, "Main", style)
+			g.safeSetFont("main", style, g.cfg.FontSize)
+			g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
 		}
 		g.pdf.Ln(lineHeight + 2)
 	}
@@ -497,7 +478,8 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	}
 
 	left, _, right, _ := g.pdf.GetMargins()
-	width := 210 - left - right
+	w, _ := g.pdf.GetPageSize()
+	width := w - left - right
 	colCount := len(t.Rows[0])
 	if colCount == 0 {
 		return
@@ -545,7 +527,7 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 				cellText += seg.Text
 			}
 
-			g.pdf.MultiCell(colWidth, g.cfg.FontSize*0.5, cellText, "", "L", false)
+			g.pdf.MultiCell(colWidth, g.cfg.FontSize*0.5, g.prepareText(cellText), "", "L", false)
 			g.pdf.SetXY(x+colWidth, y)
 		}
 		g.pdf.Ln(maxH)

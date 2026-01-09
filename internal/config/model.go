@@ -98,6 +98,7 @@ type Layout struct {
 	Margins         Margins `yaml:"margins"`                                              // Seitenränder
 	HeaderNumbering bool    `yaml:"header_numbering"`                                     // Automatische Nummerierung von Überschriften
 	LineSpacing     float64 `yaml:"line_spacing" validate:"omitempty,gt=0"`               // Zeilenabstand (z.B. 1.5)
+	FooterStyle     string  `yaml:"footer_style" validate:"omitempty,oneof=fixed inline"` // "fixed" (unten) oder "inline" (nach Content)
 }
 
 // Margins definiert die Seitenränder in Millimetern.

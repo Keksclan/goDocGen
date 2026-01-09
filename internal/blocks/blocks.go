@@ -30,6 +30,7 @@ type TextSegment struct {
 	Italic bool   // Kursiv
 	Bold   bool   // Fett
 	Code   bool   // Inline-Code
+	Link   string // URL oder lokaler Pfad
 }
 
 // ImageBlock repräsentiert ein Bild.

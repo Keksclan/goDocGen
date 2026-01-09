@@ -43,13 +43,14 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 	g.safeSetFont("main", "B", 24)
 	r, green, b := hexToRGB(g.cfg.Colors.Title)
 	g.pdf.SetTextColor(r, green, b)
-	g.pdf.CellFormat(0, 15, "Inhaltsverzeichnis", "", 1, "L", false, 0, "")
+	g.pdf.CellFormat(0, 15, g.prepareText("Inhaltsverzeichnis"), "", 1, "L", false, 0, "")
 
 	// Dekorative Linie
 	left, _, right, _ := g.pdf.GetMargins()
+	w, _ := g.pdf.GetPageSize()
 	g.pdf.SetDrawColor(r, green, b)
 	g.pdf.SetLineWidth(0.5)
-	g.pdf.Line(left, g.pdf.GetY(), 210-right, g.pdf.GetY())
+	g.pdf.Line(left, g.pdf.GetY(), w-right, g.pdf.GetY())
 	g.pdf.Ln(10)
 
 	g.setPrimaryTextColor()
@@ -85,7 +86,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 			g.safeSetFont("main", "", 10)
 			g.pdf.SetTextColor(180, 180, 180)
 			dotX := g.pdf.GetX() + 2
-			dotEndX := 210 - right - 10
+			dotEndX := w - right - 10
 			remaining := dotEndX - dotX
 			if remaining > 0 {
 				dots := ""
@@ -100,7 +101,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		// Seitenzahl
 		g.setPrimaryTextColor()
 		g.safeSetFont("main", "B", fontSize)
-		g.pdf.SetX(210 - right - 8)
+		g.pdf.SetX(w - right - 8)
 		displayPage := entry.Page - g.cfg.PageNumbers.StartPage + 1
 		if displayPage < 1 {
 			displayPage = 1
@@ -121,8 +122,8 @@ func (g *Generator) measureTOC() int {
 	}
 
 	_, top, _, bottom := g.pdf.GetMargins()
-	pageHeight := 297.0
-	usableHeight := pageHeight - top - bottom
+	_, h := g.pdf.GetPageSize()
+	usableHeight := h - top - bottom
 
 	currentY := 40.0 // Start Y laut renderTOC
 	currentY += 15.0 // Titel Höhe

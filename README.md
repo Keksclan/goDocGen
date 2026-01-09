@@ -158,8 +158,8 @@ page_numbers:
 layout:
   body: "justify"
   margins:
-    left: 20
-    right: 20
+    left: 25
+    right: 25
     top: 20
     bottom: 20
 

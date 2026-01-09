@@ -126,6 +126,7 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 	var segments []blocks.TextSegment
 	isBold := false
 	isItalic := false
+	currentLink := ""
 
 	ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if node.Kind() == ast.KindText {
@@ -135,6 +136,7 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 					Text:   string(txt.Text(source)),
 					Bold:   isBold,
 					Italic: isItalic,
+					Link:   currentLink,
 				})
 			}
 		} else if node.Kind() == ast.KindEmphasis {
@@ -151,6 +153,13 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 				} else if em.Level == 2 {
 					isBold = false
 				}
+			}
+		} else if node.Kind() == ast.KindLink {
+			lnk := node.(*ast.Link)
+			if entering {
+				currentLink = string(lnk.Destination)
+			} else {
+				currentLink = ""
 			}
 		} else if node.Kind() == ast.KindCodeSpan {
 			if entering {

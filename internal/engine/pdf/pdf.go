@@ -13,15 +13,16 @@ import (
 
 // Generator ist die zentrale Komponente zur Erzeugung des PDF-Dokuments.
 type Generator struct {
-	pdf             *gofpdf.Fpdf      // Die zugrunde liegende PDF-Bibliothek
-	cfg             *config.Config    // Die Projektkonfiguration
-	blocks          []blocks.DocBlock // Die zu rendernden Inhaltsblöcke
-	toc             []TOCEntry        // Gesammelte Inhaltsverzeichniseinträge
-	fontDir         string            // Verzeichnis der extrahierten Schriftarten
-	totalPages      int               // Gesamtanzahl der Seiten (nach Pass 1)
-	headingCounts   []int             // Zähler für die Nummerierung von Überschriften
-	registeredFonts map[string]bool   // Verfolgt bereits registrierte Schriftarten
-	inTOC           bool              // Status, ob gerade das Inhaltsverzeichnis gerendert wird
+	pdf               *gofpdf.Fpdf      // Die zugrunde liegende PDF-Bibliothek
+	cfg               *config.Config    // Die Projektkonfiguration
+	blocks            []blocks.DocBlock // Die zu rendernden Inhaltsblöcke
+	toc               []TOCEntry        // Gesammelte Inhaltsverzeichniseinträge
+	fontDir           string            // Verzeichnis der extrahierten Schriftarten
+	totalPages        int               // Gesamtanzahl der Seiten (nach Pass 1)
+	headingCounts     []int             // Zähler für die Nummerierung von Überschriften
+	registeredFonts   map[string]bool   // Verfolgt bereits registrierte Schriftarten
+	inTOC             bool              // Status, ob gerade das Inhaltsverzeichnis gerendert wird
+	currentFontIsUTF8 bool              // Status, ob die aktuelle Schriftart UTF-8 unterstützt
 }
 
 // TOCEntry repräsentiert einen Eintrag im Inhaltsverzeichnis.
@@ -53,6 +54,68 @@ func NewGenerator(cfg *config.Config, blocks []blocks.DocBlock, fontDir string) 
 	g.registerFonts(fontDir)
 
 	return g
+}
+
+// prepareText konvertiert Text je nach Schriftart (UTF-8 oder CP1252).
+func (g *Generator) prepareText(text string) string {
+	if g.currentFontIsUTF8 {
+		return text
+	}
+	// Fallback: Manuelle Konvertierung gängiger Sonderzeichen für CP1252 (Latin-1 Supplement + CP1252 extensions)
+	// Wir nutzen hier explizite Rune-Ersetzungen für maximale Sicherheit
+	runes := []rune(text)
+	var result []byte
+	for _, r := range runes {
+		switch r {
+		case 'ä':
+			result = append(result, 0xe4)
+		case 'ö':
+			result = append(result, 0xf6)
+		case 'ü':
+			result = append(result, 0xfc)
+		case 'Ä':
+			result = append(result, 0xc4)
+		case 'Ö':
+			result = append(result, 0xd6)
+		case 'Ü':
+			result = append(result, 0xdc)
+		case 'ß':
+			result = append(result, 0xdf)
+		case '•':
+			result = append(result, 0x95)
+		case '€':
+			result = append(result, 0x80)
+		case '„':
+			result = append(result, 0x84)
+		case '“':
+			result = append(result, 0x93)
+		case '”':
+			result = append(result, 0x94)
+		case '‘':
+			result = append(result, 0x91)
+		case '’':
+			result = append(result, 0x92)
+		case '–':
+			result = append(result, 0x96)
+		case '—':
+			result = append(result, 0x97)
+		case '©':
+			result = append(result, 0xa9)
+		case '®':
+			result = append(result, 0xae)
+		case '™':
+			result = append(result, 0x99)
+		case '°':
+			result = append(result, 0xb0)
+		default:
+			if r < 256 {
+				result = append(result, byte(r))
+			} else {
+				result = append(result, '?')
+			}
+		}
+	}
+	return string(result)
 }
 
 // resolveFontPath versucht den Pfad einer Schriftart aufzulösen (absolut oder relativ).
@@ -190,6 +253,12 @@ func (g *Generator) renderAll(isMeasurement bool) {
 	// Inhalt (Blöcke)
 	for _, block := range g.blocks {
 		g.renderBlock(block, isMeasurement)
+	}
+
+	// Inline-Footer am Ende des Contents
+	if !isMeasurement && g.cfg.Layout.FooterStyle == "inline" {
+		g.pdf.Ln(10)
+		g.renderFooterAt(g.pdf.GetY())
 	}
 
 	// Wenn wir im Mess-Durchgang sind, korrigieren wir nun die Seitenzahlen im TOC,

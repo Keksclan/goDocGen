@@ -8,12 +8,13 @@ import (
 
 // drawBackground zeichnet den Seitenhintergrund (Farbverlauf oder Vollfarbe).
 func (g *Generator) drawBackground() {
+	w, h := g.pdf.GetPageSize()
 	if g.cfg.Gradient.Enabled && g.cfg.Gradient.Global {
 		g.drawGradient(g.cfg.Gradient.Start, g.cfg.Gradient.End, g.cfg.Gradient.Orientation)
 	} else if g.cfg.Colors.Background != "" {
 		r, green, b := hexToRGB(g.cfg.Colors.Background)
 		g.pdf.SetFillColor(r, green, b)
-		g.pdf.Rect(0, 0, 210, 297, "F")
+		g.pdf.Rect(0, 0, w, h, "F")
 	}
 }
 
@@ -24,51 +25,84 @@ func (g *Generator) setupHeaderFooter() {
 		if g.inTOC || g.pdf.PageNo() == 1 || g.pdf.PageNo() < g.cfg.PageNumbers.StartPage {
 			return // Kein Header auf Titelseite, TOC oder vor Startseite
 		}
-		g.pdf.SetY(10)
+
+		left, top, _, _ := g.pdf.GetMargins()
+		// Header-Y ist mittig im oberen Rand
+		headerY := top / 2
+		if headerY < 5 {
+			headerY = 10
+		}
+
+		g.pdf.SetY(headerY)
 		r, green, b := hexToRGB(g.cfg.Colors.Header)
 		g.pdf.SetTextColor(r, green, b)
 		g.safeSetFont("main", "", 8)
 
 		if g.cfg.Header.Image != "" {
-			g.pdf.Image(g.cfg.Header.Image, 10, 10, 20, 0, false, "", 0, "")
-			g.pdf.SetX(35)
+			g.pdf.Image(g.cfg.Header.Image, left, headerY, 20, 0, false, "", 0, "")
+			g.pdf.SetX(left + 25)
 		} else {
-			g.pdf.SetX(10)
+			g.pdf.SetX(left)
 		}
 
-		g.pdf.CellFormat(0, 10, g.cfg.Header.Text, "", 0, "L", false, 0, "")
-		g.pdf.Ln(15)
+		g.pdf.CellFormat(0, 10, g.prepareText(g.cfg.Header.Text), "", 0, "L", false, 0, "")
+		g.pdf.Ln(top)
 	})
 
 	g.pdf.SetFooterFunc(func() {
 		if g.inTOC || g.pdf.PageNo() == 1 || g.pdf.PageNo() < g.cfg.PageNumbers.StartPage {
 			return
 		}
-		g.pdf.SetY(-15)
-		g.safeSetFont("main", "", 8)
-		g.pdf.SetTextColor(128, 128, 128)
 
-		left, _, right, _ := g.pdf.GetMargins()
-		width := 210 - left - right
-
-		if g.cfg.Footer.Image != "" {
-			g.pdf.Image(g.cfg.Footer.Image, left, 282, 15, 0, false, "", 0, "")
+		if g.cfg.Layout.FooterStyle == "inline" {
+			return // Wird manuell am Ende gerendert
 		}
 
-		// Zonen rendern
-		if g.cfg.Footer.Left != "" {
-			g.pdf.SetX(left)
-			g.pdf.CellFormat(width, 10, g.replacePlaceholders(g.cfg.Footer.Left), "", 0, "L", false, 0, "")
-		}
-		if g.cfg.Footer.Center != "" {
-			g.pdf.SetX(left)
-			g.pdf.CellFormat(width, 10, g.replacePlaceholders(g.cfg.Footer.Center), "", 0, "C", false, 0, "")
-		}
-		if g.cfg.Footer.Right != "" {
-			g.pdf.SetX(left)
-			g.pdf.CellFormat(width, 10, g.replacePlaceholders(g.cfg.Footer.Right), "", 0, "R", false, 0, "")
-		}
+		g.renderFooterAt(0)
 	})
+}
+
+// renderFooterAt rendert den Footer an einer bestimmten Y-Position oder am Seitenende.
+func (g *Generator) renderFooterAt(y float64) {
+	left, _, right, bottom := g.pdf.GetMargins()
+	w, h := g.pdf.GetPageSize()
+	width := w - left - right
+
+	if y == 0 {
+		// Footer-Y setzen (Abstand vom unteren Rand)
+		footerY := -(bottom * 0.8)
+		if footerY > -10 {
+			footerY = -15
+		}
+		g.pdf.SetY(footerY)
+	} else {
+		g.pdf.SetY(y)
+	}
+
+	g.safeSetFont("main", "", 8)
+	g.pdf.SetTextColor(128, 128, 128)
+
+	if g.cfg.Footer.Image != "" {
+		imgY := h - bottom + 2
+		if y != 0 {
+			imgY = y + 2
+		}
+		g.pdf.Image(g.cfg.Footer.Image, left, imgY, 15, 0, false, "", 0, "")
+	}
+
+	// Zonen rendern
+	if g.cfg.Footer.Left != "" {
+		g.pdf.SetX(left)
+		g.pdf.CellFormat(width, 10, g.prepareText(g.replacePlaceholders(g.cfg.Footer.Left)), "", 0, "L", false, 0, "")
+	}
+	if g.cfg.Footer.Center != "" {
+		g.pdf.SetX(left)
+		g.pdf.CellFormat(width, 10, g.prepareText(g.replacePlaceholders(g.cfg.Footer.Center)), "", 0, "C", false, 0, "")
+	}
+	if g.cfg.Footer.Right != "" {
+		g.pdf.SetX(left)
+		g.pdf.CellFormat(width, 10, g.prepareText(g.replacePlaceholders(g.cfg.Footer.Right)), "", 0, "R", false, 0, "")
+	}
 }
 
 // replacePlaceholders ersetzt Variablen wie {page}, {total}, {title} durch ihre aktuellen Werte.
@@ -106,40 +140,41 @@ func (g *Generator) renderFrontPage() {
 		g.pdf.SetTextColor(r, green, b)
 	}
 
+	left, _, _, _ := g.pdf.GetMargins()
 	g.pdf.SetY(60)
-	g.pdf.SetX(30)
+	g.pdf.SetX(left)
 	g.safeSetFont("main", "B", 40)
 	align := g.getAlign(g.cfg.Layout.StartPage)
-	g.pdf.MultiCell(0, 15, g.cfg.Title, "", align, false)
+	g.pdf.MultiCell(0, 15, g.prepareText(g.cfg.Title), "", align, false)
 
 	if g.cfg.Subtitle != "" {
 		g.pdf.Ln(5)
-		g.pdf.SetX(30)
+		g.pdf.SetX(left)
 		g.safeSetFont("main", "", 20)
 		if !g.cfg.Gradient.Enabled {
 			g.pdf.SetTextColor(100, 100, 100)
 		}
-		g.pdf.MultiCell(0, 12, g.cfg.Subtitle, "", align, false)
+		g.pdf.MultiCell(0, 12, g.prepareText(g.cfg.Subtitle), "", align, false)
 	}
 
 	if g.cfg.Author != "" {
 		g.pdf.Ln(5)
-		g.pdf.SetX(30)
+		g.pdf.SetX(left)
 		g.safeSetFont("main", "I", 14)
 		if !g.cfg.Gradient.Enabled {
 			g.pdf.SetTextColor(120, 120, 120)
 		}
-		g.pdf.MultiCell(0, 10, fmt.Sprintf("Autor: %s", g.cfg.Author), "", align, false)
+		g.pdf.MultiCell(0, 10, g.prepareText(fmt.Sprintf("Autor: %s", g.cfg.Author)), "", align, false)
 	}
 
 	g.pdf.SetY(250)
-	g.pdf.SetX(30)
+	g.pdf.SetX(left)
 	g.safeSetFont("main", "", 12)
 	if !g.cfg.Gradient.Enabled {
 		g.pdf.SetTextColor(128, 128, 128)
 	}
 	if g.cfg.Author != "" {
-		g.pdf.MultiCell(0, 10, fmt.Sprintf("Erstellt von: %s", g.cfg.Author), "", align, false)
+		g.pdf.MultiCell(0, 10, g.prepareText(fmt.Sprintf("Erstellt von: %s", g.cfg.Author)), "", align, false)
 	}
-	g.pdf.MultiCell(0, 10, fmt.Sprintf("Datum: %s", time.Now().Format("02.01.2006")), "", align, false)
+	g.pdf.MultiCell(0, 10, g.prepareText(fmt.Sprintf("Datum: %s", time.Now().Format("02.01.2006"))), "", align, false)
 }

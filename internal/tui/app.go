@@ -60,7 +60,7 @@ type model struct {
 	lastGeneratedPath  string
 }
 
-const totalInputs = 36
+const totalInputs = 38
 
 // keyMap definiert die Tastenkombinationen der TUI.
 type keyMap struct {
@@ -380,6 +380,42 @@ func (m *model) setupInputs() {
 	t.Placeholder = m.T(func(t translation) string { return t.footerRight })
 	t.SetValue(m.cfg.Footer.Right)
 	m.inputs[35] = t
+
+	// 36: Line Spacing
+	t = textinput.New()
+	t.Placeholder = "Zeilenabstand (z.B. 1.5)"
+	t.SetValue(fmt.Sprintf("%.2f", m.cfg.Layout.LineSpacing))
+	m.inputs[36] = t
+
+	// 37: Footer Style
+	t = textinput.New()
+	t.Placeholder = "Footer Style (fixed/inline)"
+	t.SetValue(m.cfg.Layout.FooterStyle)
+	m.inputs[37] = t
+}
+
+func (m *model) applyIHKStandards() {
+	if m.cfg == nil {
+		return
+	}
+
+	m.cfg.FontSize = 11.0
+	m.cfg.Layout.LineSpacing = 1.5
+	m.cfg.Layout.Margins.Left = 25.0
+	m.cfg.Layout.Margins.Right = 25.0
+	m.cfg.Layout.Margins.Top = 20.0
+	m.cfg.Layout.Margins.Bottom = 20.0
+	m.cfg.Layout.Body = "justify"
+	m.cfg.Fonts.Regular = "Arial.ttf"
+	m.cfg.Fonts.Bold = "Arial-Bold.ttf"
+	m.cfg.Fonts.Italic = "Arial-Italic.ttf"
+	m.cfg.Fonts.Mono = "Courier.ttf"
+
+	// Inputs aktualisieren
+	m.setupInputs()
+
+	m.log("IHK-Standards angewendet.")
+	m.statusMsg = "IHK-Standards angewendet (Arial, 11pt, 1.5-zeilig)"
 }
 
 func (m *model) saveConfig() {
@@ -465,6 +501,12 @@ func (m *model) saveConfig() {
 	m.cfg.Footer.Left = m.inputs[33].Value()
 	m.cfg.Footer.Center = m.inputs[34].Value()
 	m.cfg.Footer.Right = m.inputs[35].Value()
+
+	if v, err := strconv.ParseFloat(m.inputs[36].Value(), 64); err == nil {
+		m.cfg.Layout.LineSpacing = v
+	}
+
+	m.cfg.Layout.FooterStyle = m.inputs[37].Value()
 
 	err := m.cfg.Save(filepath.Join(m.projectPath, "docgen.yml"))
 	if err != nil {
@@ -567,8 +609,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.focusedSection = (m.focusedSection + 1) % len(m.configSectionsOpen)
 					return m, nil
 				}
-				if msg.String() == "k" || msg.Type == tea.KeyUp {
+				if msg.Type == tea.KeyUp {
 					m.focusedSection = (m.focusedSection + len(m.configSectionsOpen) - 1) % len(m.configSectionsOpen)
+					return m, nil
+				}
+				if msg.String() == "k" {
+					m.applyIHKStandards()
 					return m, nil
 				}
 				if msg.Type == tea.KeyEnter || msg.String() == " " {
@@ -619,7 +665,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 					// Auto-Scroll
-					m.viewport.SetYOffset(m.focusedInput * 2)
+					m.viewport.SetYOffset(m.focusedInput * 5)
 				} else if msg.Type == tea.KeyShiftTab || msg.Type == tea.KeyUp {
 					m.focusedInput = (m.focusedInput + len(m.inputs) - 1) % len(m.inputs)
 					for i := range m.inputs {
@@ -629,7 +675,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.inputs[i].Blur()
 						}
 					}
-					m.viewport.SetYOffset(m.focusedInput * 2)
+					m.viewport.SetYOffset(m.focusedInput * 5)
 				} else if msg.Type == tea.KeyEnter {
 					// Speichern
 					m.saveConfig()
@@ -656,7 +702,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				} else if (msg.Type == tea.KeyRight || msg.Type == tea.KeyLeft) && m.focusedInput == 9 {
 					// Code-Theme Switcher
-					themes := config.GetAvailableThemes()
+					themes := config.GetAvailableCodeThemes()
 					current := m.inputs[9].Value()
 					idx := -1
 					for i, t := range themes {
@@ -1042,9 +1088,21 @@ func (m *model) configView() string {
 		}
 
 		if m.focusedInput == idx {
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")).Bold(true).Render("➜ "+label+": ") + m.inputs[idx].View()
+			inputBox := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#cba6f7")).
+				Padding(0, 1).
+				Width(30).
+				Render(m.inputs[idx].View())
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")).Bold(true).Render("➜ "+label) + "\n" + inputBox
 		}
-		return keyStyle("  "+label+":") + m.inputs[idx].View()
+		inputBox := lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#45475a")).
+			Padding(0, 1).
+			Width(30).
+			Render(m.inputs[idx].View())
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")).Render("  "+label) + "\n" + inputBox
 	}
 
 	sections := []struct {
@@ -1053,8 +1111,8 @@ func (m *model) configView() string {
 		color   string
 	}{
 		{m.T(func(t translation) string { return t.sectionBasis }), []int{0, 1, 2}, "#cba6f7"},
-		{m.T(func(t translation) string { return t.sectionLayout }), []int{3, 15, 16, 4, 5, 6, 7, 32}, "#89b4fa"},
-		{m.T(func(t translation) string { return t.sectionHeader }), []int{10, 11, 12, 13, 33, 34, 35}, "#f9e2af"},
+		{m.T(func(t translation) string { return t.sectionLayout }), []int{3, 36, 15, 16, 4, 5, 6, 7, 32}, "#89b4fa"},
+		{m.T(func(t translation) string { return t.sectionHeader }), []int{10, 11, 12, 13, 33, 34, 35, 37}, "#f9e2af"},
 		{m.T(func(t translation) string { return t.sectionDesign }), []int{14, 8, 9}, "#a6e3a1"},
 		{m.T(func(t translation) string { return t.sectionTOC }), []int{29, 30, 31}, "#fab387"},
 		{m.T(func(t translation) string { return t.sectionGradient }), []int{17, 18, 19, 20, 21}, "#eba0ac"},
@@ -1078,19 +1136,27 @@ func (m *model) configView() string {
 
 		if isOpen {
 			var rows []string
-			for j := 0; j < len(sec.indices); j += 2 {
-				leftIdx := sec.indices[j]
-				left := renderInput(leftIdx)
+			if m.configEditMode {
+				// Einspaltig im Edit-Modus für mehr Übersicht und Platz für Boxen
+				for _, idx := range sec.indices {
+					rows = append(rows, renderInput(idx)+"\n")
+				}
+			} else {
+				// Zweispaltig im Lese-Modus
+				for j := 0; j < len(sec.indices); j += 2 {
+					leftIdx := sec.indices[j]
+					left := renderInput(leftIdx)
 
-				if j+1 < len(sec.indices) {
-					rightIdx := sec.indices[j+1]
-					right := renderInput(rightIdx)
-					rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
-						lipgloss.NewStyle().Width(m.viewport.Width/2).Render(left),
-						lipgloss.NewStyle().Width(m.viewport.Width/2).Render(right),
-					)+"\n")
-				} else {
-					rows = append(rows, left+"\n")
+					if j+1 < len(sec.indices) {
+						rightIdx := sec.indices[j+1]
+						right := renderInput(rightIdx)
+						rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top,
+							lipgloss.NewStyle().Width(m.viewport.Width/2).Render(left),
+							lipgloss.NewStyle().Width(m.viewport.Width/2).Render(right),
+						)+"\n")
+					} else {
+						rows = append(rows, left+"\n")
+					}
 				}
 			}
 			s.WriteString(strings.Join(rows, ""))
@@ -1099,7 +1165,7 @@ func (m *model) configView() string {
 
 	if !m.configEditMode {
 		s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")).Bold(true).Render("▶ "+m.T(func(t translation) string { return t.pressEToEdit })))
-		s.WriteString("\n" + infoStyle.Render("💡 ↑/↓: Sektion wählen | ENTER: Auf/Zu | E: Bearbeiten | ESC: Hilfe"))
+		s.WriteString("\n" + infoStyle.Render("💡 ↑/↓: Sektion wählen | ENTER: Auf/Zu | E: Bearbeiten | k: IHK-Standards | ESC: Hilfe"))
 	} else {
 		s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true).Render("📝 "+m.T(func(t translation) string { return t.editMode })))
 		s.WriteString("\n" + infoStyle.Render("💡 ENTER: Speichern | TAB/↑↓: Navigieren | ESC: Zurück | CTRL+←/→: Tab"))
