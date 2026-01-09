@@ -56,23 +56,37 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 
 	numbering := ""
-	if g.cfg.Layout.HeaderNumbering {
-		if h.ParentNumbering != "" {
-			// Verwende die Nummerierung aus der Ordnerstruktur
-			// Diese wird für Überschriften innerhalb der Datei erweitert
-			numbering = h.ParentNumbering
+	text := h.Text
 
-			// Für jede Überschriften-Ebene hängen wir den aktuellen Zähler an
-			for i := 0; i < h.Level; i++ {
-				count := g.headingCounts[i]
-				if count == 0 {
-					count = 1
+	// Versuche Nummerierung aus dem Text zu extrahieren
+	extractedNum, remainingText := splitNumberingAndText(text)
+
+	if extractedNum != "" {
+		// Wenn im Text eine Nummerierung gefunden wurde, verwenden wir diese bevorzugt
+		numbering = extractedNum
+		text = remainingText
+	} else if g.cfg.Layout.HeaderNumbering {
+		// Ansonsten automatische Nummerierung, falls aktiviert
+		if h.ParentNumbering != "" {
+			numbering = h.ParentNumbering
+			// Wir verwenden Punkte für die Hierarchie (1.1.1)
+			if !strings.HasSuffix(numbering, ".") && numbering != "" {
+				numbering += "."
+			}
+
+			// Wir hängen nur an, wenn ParentNumbering nicht schon die Nummer für diesen Header ist
+			// In der neuen Logik ist ParentNumbering oft die Nummer des ersten Headers der Datei
+			if h.Level > 1 {
+				for i := 1; i < h.Level; i++ {
+					count := g.headingCounts[i]
+					if count == 0 {
+						count = 1
+					}
+					numbering += fmt.Sprintf("%d", count)
+					if i < h.Level-1 {
+						numbering += "."
+					}
 				}
-				// Wir verwenden Punkte für die Hierarchie (1.1.1)
-				if !strings.HasSuffix(numbering, ".") && numbering != "" {
-					numbering += "."
-				}
-				numbering += fmt.Sprintf("%d", count)
 			}
 			if numbering != "" && !strings.HasSuffix(numbering, ".") {
 				numbering += "."
@@ -87,17 +101,10 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 				numbering += fmt.Sprintf("%d.", count)
 			}
 		}
-
-		if numbering != "" {
-			numbering += " "
-		}
 	}
 
-	text := h.Text
-	if numbering != "" {
-		// Falls im Markdown-Text bereits eine Nummerierung vorhanden ist (z.B. "1. Einleitung"),
-		// entfernen wir diese, um doppelte Nummern zu vermeiden.
-		text = trimLeadingNumbering(text)
+	if numbering != "" && !strings.HasSuffix(numbering, " ") {
+		numbering += " "
 	}
 
 	link := g.pdf.AddLink()
@@ -155,10 +162,10 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	g.pdf.Ln(3)
 }
 
-// trimLeadingNumbering entfernt führende Nummern wie "1. ", "1.1 " oder "1) " aus einem String.
-func trimLeadingNumbering(s string) string {
+// splitNumberingAndText extrahiert eine führende Nummerierung und den restlichen Text.
+func splitNumberingAndText(s string) (string, string) {
 	s = strings.TrimSpace(s)
-	// Wir suchen nach einem Muster am Anfang: Zahlen, Punkte, Leerzeichen
+	// Wir suchen nach einem Muster am Anfang: Zahlen, Punkte, gefolgt von Leerzeichen
 	i := 0
 	foundDigit := false
 	for i < len(s) {
@@ -166,17 +173,25 @@ func trimLeadingNumbering(s string) string {
 		if r >= '0' && r <= '9' {
 			foundDigit = true
 			i++
-		} else if r == '.' || r == ')' || r == ' ' || r == '\t' {
+		} else if r == '.' || r == ')' {
 			i++
+		} else if r == ' ' || r == '\t' {
+			// Ende der Nummerierung erreicht
+			if foundDigit {
+				return s[:i], strings.TrimSpace(s[i:])
+			}
+			break
 		} else {
 			break
 		}
 	}
+	return "", s
+}
 
-	if foundDigit && i < len(s) {
-		return strings.TrimSpace(s[i:])
-	}
-	return s
+// trimLeadingNumbering entfernt führende Nummern wie "1. ", "1.1 " oder "1) " aus einem String.
+func trimLeadingNumbering(s string) string {
+	_, text := splitNumberingAndText(s)
+	return text
 }
 
 // safeWrite schreibt Text sicher in das PDF und fängt Panics der PDF-Bibliothek ab.

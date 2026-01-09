@@ -2,23 +2,6 @@ package pdf
 
 import "fmt"
 
-// getEntryHeight berechnet die Höhe eines Inhaltsverzeichniseintrags basierend auf seiner Ebene.
-func getEntryHeight(level int, scale float64) float64 {
-	fontSize := 12.0 * scale
-	extra := 0.0
-	if level == 1 {
-		fontSize = 13.0 * scale
-		extra = 2.0 * scale
-	} else if level == 2 {
-		fontSize = 11.0 * scale
-		extra = 0.0
-	} else {
-		fontSize = 10.0 * scale
-		extra = 0.0
-	}
-	return fontSize*0.8 + 2*scale + extra
-}
-
 // renderTOC rendert das Inhaltsverzeichnis mit klickbaren Links und Seitenzahlen.
 // Im Measurement-Modus gibt es die Anzahl der benötigten Seiten zurück.
 func (g *Generator) renderTOC(isMeasurement bool) int {
@@ -44,9 +27,9 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		g.pdf.Ln(10) // Linie
 
 		for _, entry := range g.toc {
-			h := 10.0
+			h := 8.5
 			if entry.Level == 1 {
-				h = 12.0
+				h = 10.5
 			}
 			g.checkPageBreak(h)
 			g.pdf.Ln(h)
@@ -76,11 +59,13 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		g.pdf.SetX(left + indent)
 
 		fontSize := 12.0
+		h := 8.5
 		style := ""
 		if entry.Level == 1 {
 			style = "B"
 			g.safeSetFont("main", style, 12)
-			g.pdf.Ln(2)
+			g.pdf.Ln(1)
+			h = 10.5
 		} else {
 			g.safeSetFont("main", "", 11)
 			fontSize = 11.0
@@ -93,7 +78,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		text += entry.Text
 
 		// Eintragstext als Link
-		g.safeWriteLinkID(fontSize, text, "main", style, entry.Link)
+		g.safeWriteLinkID(h, text, "main", style, entry.Link)
 
 		// Punkte zwischen Text und Seitenzahl
 		if g.cfg.TOC.ShowDots {
@@ -108,7 +93,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 				for i := 0; float64(i)*dotW < remaining; i++ {
 					dots += "."
 				}
-				g.pdf.CellFormat(remaining, fontSize, dots, "", 0, "L", false, 0, "")
+				g.pdf.CellFormat(remaining, h, dots, "", 0, "L", false, 0, "")
 			}
 		}
 
@@ -120,7 +105,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		if displayPage < 1 {
 			displayPage = 1
 		}
-		g.pdf.CellFormat(8, fontSize, fmt.Sprintf("%d", displayPage), "", 1, "R", false, entry.Link, "")
+		g.pdf.CellFormat(8, h, fmt.Sprintf("%d", displayPage), "", 1, "R", false, entry.Link, "")
 	}
 
 	// Sicherstellen, dass der nächste Inhalt auf einer neuen Seite beginnt
@@ -145,10 +130,10 @@ func (g *Generator) measureTOC() int {
 
 	pages := 1
 	for _, entry := range g.toc {
-		h := 11.0
+		h := 8.5
 		if entry.Level == 1 {
-			h = 12.0
-			currentY += 2.0 // Extra-Abstand für Top-Level laut renderTOC
+			h = 10.5
+			currentY += 1.0 // Extra-Abstand für Top-Level laut renderTOC
 		}
 
 		// checkPageBreak Logik simulieren

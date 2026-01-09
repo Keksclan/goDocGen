@@ -12,12 +12,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 )
 
 type numberedFile struct {
 	path      string
 	numbering string
+	sortKey   string
 }
 
 // Builder koordiniert den gesamten Build-Prozess eines Dokumentationsprojekts.
@@ -71,9 +74,9 @@ func (b *Builder) Build() (string, error) {
 		fontDir = b.ProjectDir
 	}
 
-	// 3. Markdown-Dateien rekursiv laden mit Nummerierung basierend auf Ordnerstruktur
+	// 3. Markdown-Dateien rekursiv laden und nach Header-Nummern sortieren
 	contentDir := filepath.Join(b.ProjectDir, "content")
-	numberedFiles, err := b.scanContent(contentDir, "", 0)
+	numberedFiles, err := b.scanAndSortContent(contentDir)
 	if err != nil {
 		return "", fmt.Errorf("Content-Verzeichnis konnte nicht gelesen werden: %w", err)
 	}
@@ -153,9 +156,30 @@ func (b *Builder) Build() (string, error) {
 	return outputPath, gen.Generate(outputPath)
 }
 
-// scanContent durchläuft ein Verzeichnis rekursiv und weist jeder MD-Datei eine Nummer basierend auf der Hierarchie zu.
-func (b *Builder) scanContent(dir string, parentNum string, level int) ([]numberedFile, error) {
-	entries, err := os.ReadDir(dir)
+// scanAndSortContent durchläuft das Verzeichnis, extrahiert Header-Nummern und sortiert danach.
+func (b *Builder) scanAndSortContent(dir string) ([]numberedFile, error) {
+	var files []numberedFile
+
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		sortKey, numbering := b.extractHeaderInfo(path)
+		files = append(files, numberedFile{
+			path:      path,
+			sortKey:   sortKey,
+			numbering: numbering,
+		})
+		return nil
+	})
+
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -163,60 +187,66 @@ func (b *Builder) scanContent(dir string, parentNum string, level int) ([]number
 		return nil, err
 	}
 
-	var files []numberedFile
-	relevantIndex := 1
-	for _, entry := range entries {
-		name := entry.Name()
-		// Ignoriere versteckte Dateien und spezielle Ordner
-		if strings.HasPrefix(name, ".") || name == "dist" || name == "assets" || name == "fonts" {
-			continue
-		}
+	// Sortieren basierend auf dem sortKey (numerisch)
+	sort.Slice(files, func(i, j int) bool {
+		return compareVersions(files[i].sortKey, files[j].sortKey)
+	})
 
-		fullPath := filepath.Join(dir, name)
-
-		// Prüfen, ob der Eintrag relevant ist (MD-Datei oder Ordner mit MD-Dateien)
-		isMD := !entry.IsDir() && filepath.Ext(name) == ".md"
-		hasMD := false
-		if entry.IsDir() {
-			err := filepath.WalkDir(fullPath, func(path string, d os.DirEntry, err error) error {
-				if err != nil {
-					return err
-				}
-				if !d.IsDir() && filepath.Ext(path) == ".md" {
-					hasMD = true
-					return filepath.SkipAll
-				}
-				return nil
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if !isMD && !hasMD {
-			continue
-		}
-
-		num := ""
-		if level == 0 {
-			num = fmt.Sprintf("%d.", relevantIndex)
-		} else {
-			num = fmt.Sprintf("%s_%d", strings.TrimSuffix(parentNum, "."), relevantIndex)
-		}
-
-		if entry.IsDir() {
-			subFiles, err := b.scanContent(fullPath, num, level+1)
-			if err != nil {
-				return nil, err
-			}
-			files = append(files, subFiles...)
-		} else {
-			files = append(files, numberedFile{
-				path:      fullPath,
-				numbering: num,
-			})
-		}
-		relevantIndex++
-	}
 	return files, nil
+}
+
+// extractHeaderInfo liest die erste Header-Zeile und extrahiert die Nummerierung.
+func (b *Builder) extractHeaderInfo(path string) (string, string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "999", ""
+	}
+
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	// Suche nach dem ersten Header (# Text oder ## Text)
+	re := regexp.MustCompile(`^#+\s+(([0-9]+\.)+[0-9]*|[0-9]+)`)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			matches := re.FindStringSubmatch(line)
+			if len(matches) > 1 {
+				num := matches[1]
+				// SortKey ist die reine Nummer ohne Punkt am Ende für den Vergleich
+				sortKey := strings.TrimSuffix(num, ".")
+				return sortKey, num
+			}
+			// Wenn ein Header ohne Nummer gefunden wird, ans Ende sortieren
+			return "999", ""
+		}
+	}
+
+	return "999", ""
+}
+
+// compareVersions vergleicht zwei Versionsnummern wie "1.1.1" und "1.2".
+func compareVersions(v1, v2 string) bool {
+	if v1 == "999" {
+		return false
+	}
+	if v2 == "999" {
+		return true
+	}
+
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	for i := 0; i < len(parts1) && i < len(parts2); i++ {
+		var n1, n2 int
+		fmt.Sscanf(parts1[i], "%d", &n1)
+		fmt.Sscanf(parts2[i], "%d", &n2)
+
+		if n1 != n2 {
+			return n1 < n2
+		}
+	}
+
+	return len(parts1) < len(parts2)
 }
