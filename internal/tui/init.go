@@ -33,7 +33,7 @@ func InitialInitModel(defaultPath string) InitModel {
 
 	return InitModel{
 		pathInput:    ti,
-		themeChoices: []string{"Catppuccin Mocha (Dunkel)", "Catppuccin Latte (Hell)", "Catppuccin Frappe", "Catppuccin Macchiato", "Red White (Modern)"},
+		themeChoices: []string{"Catppuccin Mocha (Dunkel)", "Catppuccin Latte (Hell)", "Catppuccin Frappe", "Catppuccin Macchiato", "Red White (Modern)", "IHK-Standard (Arial, 11pt, 1.5-zeilig)"},
 		step:         0,
 		Path:         defaultPath,
 	}
@@ -97,6 +97,9 @@ func (m InitModel) finishInit() tea.Cmd {
 		theme := "catppuccin-mocha"
 		accent := "#89b4fa"
 		titleColor := "#89b4fa"
+		fontSize := 12.0
+		lineSpacing := 1.0
+		marginLeft, marginRight, marginTop, marginBottom := 10.0, 10.0, 10.0, 10.0
 
 		switch m.cursor {
 		case 1:
@@ -115,6 +118,16 @@ func (m InitModel) finishInit() tea.Cmd {
 			theme = "red-white"
 			accent = "#e30613"
 			titleColor = "#e30613"
+		case 5:
+			theme = "github"
+			accent = "#24292e"
+			titleColor = "#24292e"
+			fontSize = 11.0
+			lineSpacing = 1.5
+			marginLeft = 25.0
+			marginRight = 25.0
+			marginTop = 20.0
+			marginBottom = 20.0
 		}
 
 		dirs := []string{"content", "assets", "fonts"}
@@ -124,13 +137,15 @@ func (m InitModel) finishInit() tea.Cmd {
 			}
 		}
 
-		configContent := fmt.Sprintf(`title: "Meine Dokumentation"
-subtitle: "Erstellt mit goDocGen"
+		configContent := fmt.Sprintf(`title: "Projektdokumentation"
+subtitle: "Betriebliche Projektarbeit"
 author: "Dein Name"
 header:
-  text: "Mein Unternehmen"
+  text: "Abschlussprüfung Sommer 2026"
 footer:
-  text: "© 2026 Mein Unternehmen"
+  left: "{author}"
+  center: "{title}"
+  right: "Seite {page} von {total}"
 colors:
   title: "%s"
   header: "%s"
@@ -141,15 +156,16 @@ fonts:
   bold: "Arial-Bold.ttf"
   italic: "Arial-Italic.ttf"
   mono: "Courier.ttf"
-font_size: 12
+font_size: %.1f
 layout:
   startpage: "center"
   body: "justify"
+  line_spacing: %.1f
   margins:
-    left: 10
-    right: 10
-    top: 10
-    bottom: 10
+    left: %.1f
+    right: %.1f
+    top: %.1f
+    bottom: %.1f
 gradient:
   enabled: false
   start: "#1e1e2e"
@@ -157,7 +173,7 @@ gradient:
   orientation: "vertical"
   global: false
 code_theme: "%s"
-`, titleColor, titleColor, accent, theme)
+`, titleColor, titleColor, accent, fontSize, lineSpacing, marginLeft, marginRight, marginTop, marginBottom, theme)
 
 		if err := os.WriteFile(filepath.Join(target, "docgen.yml"), []byte(configContent), 0644); err != nil {
 			return err

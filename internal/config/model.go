@@ -97,6 +97,7 @@ type Layout struct {
 	Body            string  `yaml:"body" validate:"oneof=left center right justify"`      // Standard-Textausrichtung
 	Margins         Margins `yaml:"margins"`                                              // Seitenränder
 	HeaderNumbering bool    `yaml:"header_numbering"`                                     // Automatische Nummerierung von Überschriften
+	LineSpacing     float64 `yaml:"line_spacing" validate:"omitempty,gt=0"`               // Zeilenabstand (z.B. 1.5)
 }
 
 // Margins definiert die Seitenränder in Millimetern.

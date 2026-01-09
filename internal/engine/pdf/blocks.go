@@ -256,15 +256,25 @@ func (g *Generator) safeWriteLinkID(size float64, text string, family string, st
 	g.pdf.WriteLinkID(size, text, link)
 }
 
+// getLineHeight berechnet die Zeilenhöhe basierend auf Schriftgröße und konfiguriertem Zeilenabstand.
+func (g *Generator) getLineHeight() float64 {
+	spacing := g.cfg.Layout.LineSpacing
+	if spacing <= 0 {
+		spacing = 1.0
+	}
+	lh := g.cfg.FontSize * 0.5 * spacing
+	if lh < 5 {
+		lh = 5
+	}
+	return lh
+}
+
 // renderParagraph rendert einen Textabsatz mit Unterstützung für Fett, Kursiv und Inline-Code.
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 
-	lineHeight := g.cfg.FontSize * 0.5
-	if lineHeight < 5 {
-		lineHeight = 5
-	}
+	lineHeight := g.getLineHeight()
 
 	for _, seg := range p.Content {
 		style := ""
@@ -455,10 +465,7 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 func (g *Generator) renderList(l blocks.ListBlock) {
 	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
-	lineHeight := g.cfg.FontSize * 0.5
-	if lineHeight < 5 {
-		lineHeight = 5
-	}
+	lineHeight := g.getLineHeight()
 
 	for i, item := range l.Items {
 		prefix := "• "

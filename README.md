@@ -94,6 +94,7 @@ Die `docgen.yml` steuert das gesamte Erscheinungsbild Ihres Dokuments. Hier ist 
 - `layout`:
   - `startpage`: Ausrichtung des Titels (`left`, `center`, `right`, `justify`).
   - `body`: Standard-Textausrichtung (`left`, `center`, `right`, `justify`).
+  - `line_spacing`: Zeilenabstand als Faktor (z.B. `1.5` für anderthalbzeilig, Default: `1.0`).
   - `margins`: Seitenränder in mm (`left`, `right`, `top`, `bottom`).
 - `page_numbers`:
   - `start_page`: Die physische Seite, ab der die Seitennummerierung im Footer beginnt (z.B. `3`).
