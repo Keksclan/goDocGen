@@ -231,6 +231,7 @@ func GetAvailableCodeThemes() []string {
 		"vim",
 		"fruity",
 		"base16-snazzy",
+		"ihk", // IHK Theme: Weißer Hintergrund mit blauer Syntax-Hervorhebung
 	}
 }
 
