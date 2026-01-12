@@ -107,10 +107,13 @@ func (b *Builder) Build() (string, error) {
 					},
 				}
 			} else {
+				// Mermaid-Konfiguration für Größe anwenden
 				allBlocks[i] = blocks.ImageBlock{
 					Path:  pngPath,
 					Alt:   "Mermaid Diagram (SVG Quelle: " + svgPath + ")",
 					Title: blk.Title,
+					Width: cfg.Mermaid.Width, // Konfigurierbare Breite
+					Scale: cfg.Mermaid.Scale, // Konfigurierbare Skalierung
 				}
 			}
 		case blocks.CodeBlock:

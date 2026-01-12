@@ -44,9 +44,8 @@ font_size: 11
 
 	builder := engine.NewBuilder(tmpDir, filepath.Join(tmpDir, "dist"))
 	// This will likely fail at PDF generation due to invalid font, but we can check if it gets there.
-	err := builder.Build()
+	_, err := builder.Build()
 	if err != nil {
 		t.Logf("Build failed as expected (no real font): %v", err)
 	}
 }
-

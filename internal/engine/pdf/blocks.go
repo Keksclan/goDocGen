@@ -5,7 +5,59 @@ import (
 	"godocgen/internal/blocks"
 	"fmt"
 	"strings"
+	"unicode"
 )
+
+// cleanCodeText entfernt problematische Unicode-Zeichen aus Code-Text.
+// Dies verhindert Kästchen und seltsame Darstellungen im PDF.
+func cleanCodeText(text string) string {
+	var result strings.Builder
+	for _, r := range text {
+		// Tabs durch 4 Leerzeichen ersetzen (Standard für Code)
+		if r == '\t' {
+			result.WriteString("    ")
+		} else if r == '\n' || r == '\r' {
+			result.WriteRune(r)
+		} else if r >= 32 && r < 127 {
+			// Standard ASCII druckbare Zeichen
+			result.WriteRune(r)
+		} else if r >= 128 && r < 256 {
+			// Latin-1 Supplement (Umlaute etc.)
+			result.WriteRune(r)
+		} else if unicode.IsPrint(r) && !unicode.IsControl(r) {
+			// Andere druckbare Unicode-Zeichen (aber keine Steuerzeichen)
+			// Ersetze durch ASCII-Äquivalent wenn möglich
+			switch r {
+			case '→':
+				result.WriteString("->")
+			case '←':
+				result.WriteString("<-")
+			case '≥':
+				result.WriteString(">=")
+			case '≤':
+				result.WriteString("<=")
+			case '≠':
+				result.WriteString("!=")
+			case '…':
+				result.WriteString("...")
+			case '\u00A0': // Non-breaking space
+				result.WriteRune(' ')
+			case '\uFEFF': // BOM
+				// Ignorieren
+			case '\u200B', '\u200C', '\u200D': // Zero-width spaces
+				// Ignorieren
+			default:
+				// Für andere Unicode-Zeichen: prüfen ob im erweiterten Latin-Bereich
+				if r < 0x2000 {
+					result.WriteRune(r)
+				}
+				// Sonst ignorieren (z.B. Emoji, spezielle Symbole)
+			}
+		}
+		// Steuerzeichen und andere problematische Zeichen werden ignoriert
+	}
+	return result.String()
+}
 
 // renderBlock entscheidet anhand des Typs des Blocks, welche Rendering-Funktion aufgerufen wird.
 func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
@@ -24,6 +76,8 @@ func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
 		g.renderList(b)
 	case blocks.TableBlock:
 		g.renderTable(b)
+	case blocks.BlockquoteBlock:
+		g.renderBlockquote(b)
 	case blocks.PageBreakBlock:
 		g.pdf.AddPage()
 	}
@@ -40,7 +94,12 @@ func (g *Generator) safeSetFont(family string, style string, size float64) {
 	if g.registeredFonts[key] {
 		g.pdf.SetFont(family, style, size)
 		g.currentFontIsUTF8 = true
+	} else if style != "" && g.registeredFonts["main"+style] {
+		// Fallback: Versuche den Style mit dem main-Font
+		g.pdf.SetFont("main", style, size)
+		g.currentFontIsUTF8 = true
 	} else if g.registeredFonts["main"] {
+		// Letzter Fallback: main ohne Style
 		g.pdf.SetFont("main", "", size)
 		g.currentFontIsUTF8 = true
 	} else {
@@ -199,11 +258,16 @@ func trimLeadingNumbering(s string) string {
 
 // safeWrite schreibt Text sicher in das PDF und fängt Panics der PDF-Bibliothek ab.
 func (g *Generator) safeWrite(size float64, text string, family string, style string, link string) {
+	g.safeWriteWithFontSize(size, text, family, style, link, g.cfg.FontSize)
+}
+
+// safeWriteWithFontSize schreibt Text sicher in das PDF mit einer spezifischen Schriftgröße.
+func (g *Generator) safeWriteWithFontSize(size float64, text string, family string, style string, link string, fontSize float64) {
 	if text == "" {
 		return
 	}
 
-	g.safeSetFont(family, style, g.cfg.FontSize)
+	g.safeSetFont(family, style, fontSize)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -248,7 +312,7 @@ func (g *Generator) getLineHeight() float64 {
 	return lh
 }
 
-// renderParagraph rendert einen Textabsatz mit Unterstützung für Fett, Kursiv und Inline-Code.
+// renderParagraph rendert einen Textabsatz mit Unterstützung für Fett, Kursiv, Durchgestrichen und Inline-Code.
 func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
@@ -269,29 +333,131 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 			if g.cfg.Fonts.Mono != "" {
 				fontFamily = "mono"
 			}
-			g.safeSetFont(fontFamily, "", g.cfg.FontSize)
+			// Inline-Code verwendet Code-Schriftgröße (getrennt von normaler Schriftgröße)
+			codeFontSize := g.cfg.Code.FontSize
+			if codeFontSize <= 0 {
+				codeFontSize = 6.0 // Standard für Code (kleiner für kompaktere Darstellung)
+			}
+			g.safeSetFont(fontFamily, "", codeFontSize)
 			g.pdf.SetFillColor(240, 240, 240)
 			if seg.Text != "" {
-				g.safeWrite(lineHeight, seg.Text, fontFamily, "", seg.Link)
+				codeLineHeight := codeFontSize * 0.5
+				g.safeWriteWithFontSize(codeLineHeight, seg.Text, fontFamily, "", seg.Link, codeFontSize)
 			}
 		} else {
 			g.safeSetFont("main", style, g.cfg.FontSize)
 			if seg.Text != "" {
+				// Strikethrough: Position vor dem Text merken
+				startX := g.pdf.GetX()
+				startY := g.pdf.GetY()
+
 				g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
+
+				// Strikethrough-Linie zeichnen
+				if seg.Strikethrough {
+					endX := g.pdf.GetX()
+					// Linie in der Mitte des Textes zeichnen
+					strikeY := startY + g.cfg.FontSize*0.35
+					g.pdf.SetDrawColor(0, 0, 0)
+					g.pdf.SetLineWidth(0.3)
+					g.pdf.Line(startX, strikeY, endX, strikeY)
+				}
 			}
 		}
 	}
 	g.pdf.Ln(lineHeight + 2)
 }
 
+// calculateCodeFontSize berechnet die optimale Schriftgröße für einen Code-Block
+// basierend auf Zeilenanzahl, maximaler Zeilenlänge und verfügbarer Seitenhöhe.
+func (g *Generator) calculateCodeFontSize(lineCount int, maxLineLen int) float64 {
+	// Basis-Schriftgröße ermitteln - Standard ist 6 für sehr kompakte Code-Darstellung
+	baseFontSize := 6.0
+	if g.cfg.Code.FontSize > 0 {
+		baseFontSize = g.cfg.Code.FontSize
+	}
+
+	// Wenn AutoScale deaktiviert ist, Basis-Schriftgröße zurückgeben
+	if !g.cfg.Code.AutoScale {
+		return baseFontSize
+	}
+
+	// Standardwerte für Schwellenwerte
+	maxLen := 80
+	minFontSize := 4.0 // Reduziert von 6.0 für sehr lange Code-Blöcke
+
+	if g.cfg.Code.MaxLineLen > 0 {
+		maxLen = g.cfg.Code.MaxLineLen
+	}
+	if g.cfg.Code.MinFontSize > 0 {
+		minFontSize = g.cfg.Code.MinFontSize
+	}
+
+	fontSize := baseFontSize
+
+	// Berechne verfügbare Seitenhöhe
+	_, top, _, bottom := g.pdf.GetMargins()
+	_, pageHeight := g.pdf.GetPageSize()
+	availableHeight := pageHeight - top - bottom - 30 // 30 für Header/Footer und Padding
+
+	// Berechne benötigte Höhe bei aktueller Schriftgröße
+	// lineHeight = fontSize * 0.35, rectHeight = lineCount * lineHeight + 10
+	neededHeight := float64(lineCount)*(fontSize*0.35) + 10
+
+	// Skalierung basierend auf Seitenhöhe (wichtigste Anpassung)
+	if neededHeight > availableHeight {
+		// Berechne die maximale Schriftgröße, die auf die Seite passt
+		// availableHeight = lineCount * (fontSize * 0.35) + 10
+		// availableHeight - 10 = lineCount * fontSize * 0.35
+		// fontSize = (availableHeight - 10) / (lineCount * 0.35)
+		maxFontForHeight := (availableHeight - 10) / (float64(lineCount) * 0.35)
+		if maxFontForHeight < fontSize {
+			fontSize = maxFontForHeight
+		}
+	}
+
+	// Skalierung basierend auf Zeilenlänge
+	if maxLineLen > maxLen {
+		// Berechne verfügbare Breite
+		left, _, right, _ := g.pdf.GetMargins()
+		w, _ := g.pdf.GetPageSize()
+		availableWidth := w - left - right - 10 // 10 für Padding
+
+		// Schätze benötigte Breite bei aktueller Schriftgröße
+		charWidth := fontSize * 0.5 // Ungefähre Zeichenbreite für Monospace
+		neededWidth := float64(maxLineLen) * charWidth
+
+		if neededWidth > availableWidth {
+			lenRatio := availableWidth / neededWidth
+			newFontSize := fontSize * lenRatio
+			if newFontSize < fontSize {
+				fontSize = newFontSize
+			}
+		}
+	}
+
+	// Minimale Schriftgröße einhalten
+	if fontSize < minFontSize {
+		fontSize = minFontSize
+	}
+
+	return fontSize
+}
+
+// coloredSegment repräsentiert ein Textsegment mit Farbinformation für Syntax-Highlighting.
+type coloredSegment struct {
+	text  string
+	color string
+}
+
 // renderCode rendert einen Codeblock mit Syntax-Highlighting und abgerundeten Ecken.
+// Bei sehr langen Code-Blöcken wird der Code automatisch auf mehrere Seiten aufgeteilt.
 func (g *Generator) renderCode(c blocks.CodeBlock) {
 	fontFamily := "main"
 	if g.cfg.Fonts.Mono != "" {
 		fontFamily = "mono"
 	}
 
-	g.safeSetFont(fontFamily, "", g.cfg.FontSize)
 	bgR, bgG, bgB := 245, 245, 245
 	if c.BgColor != "" {
 		r, green, b := hexToRGB(c.BgColor)
@@ -299,88 +465,158 @@ func (g *Generator) renderCode(c blocks.CodeBlock) {
 			bgR, bgG, bgB = r, green, b
 		}
 	}
-	g.pdf.SetFillColor(bgR, bgG, bgB)
-	g.pdf.SetDrawColor(200, 200, 200)
 
-	lineCount := 0
+	// Alle Code-Zeilen extrahieren mit Segmenten für Syntax-Highlighting
+	var allLines [][]coloredSegment
+	var currentLine []coloredSegment
+
 	for _, seg := range c.Segments {
-		for _, r := range seg.Text {
+		segColor := seg.Color
+		// Bereinige den Text von problematischen Unicode-Zeichen
+		text := cleanCodeText(seg.Text)
+		currentText := ""
+
+		for _, r := range text {
 			if r == '\n' {
-				lineCount++
+				// Aktuelles Segment zur Zeile hinzufügen (falls Text vorhanden)
+				if currentText != "" {
+					currentLine = append(currentLine, coloredSegment{text: currentText, color: segColor})
+					currentText = ""
+				}
+				// Zeile abschließen
+				allLines = append(allLines, currentLine)
+				currentLine = nil
+			} else {
+				currentText += string(r)
 			}
 		}
+		// Restlichen Text als Segment hinzufügen
+		if currentText != "" {
+			currentLine = append(currentLine, coloredSegment{text: currentText, color: segColor})
+		}
 	}
-	if lineCount == 0 && len(c.Segments) > 0 {
+	// Letzte Zeile hinzufügen
+	if len(currentLine) > 0 || len(allLines) == 0 {
+		allLines = append(allLines, currentLine)
+	}
+
+	lineCount := len(allLines)
+	if lineCount == 0 {
 		lineCount = 1
-	} else if len(c.Segments) > 0 && c.Segments[len(c.Segments)-1].Text != "" && c.Segments[len(c.Segments)-1].Text[len(c.Segments[len(c.Segments)-1].Text)-1] != '\n' {
-		lineCount++
 	}
 
-	lineHeight := g.cfg.FontSize * 0.5
-	rectHeight := float64(lineCount)*lineHeight + 10
+	// Maximale Zeilenlänge ermitteln
+	maxLineLen := 0
+	for _, line := range allLines {
+		lineLen := 0
+		for _, seg := range line {
+			lineLen += len(seg.text)
+		}
+		if lineLen > maxLineLen {
+			maxLineLen = lineLen
+		}
+	}
 
-	g.checkPageBreak(rectHeight + 10)
+	// Verfügbare Seitenhöhe berechnen
+	_, top, _, bottom := g.pdf.GetMargins()
+	_, pageHeight := g.pdf.GetPageSize()
+	availableHeight := pageHeight - top - bottom - 40 // Platz für Header/Footer
 
-	x := g.pdf.GetX()
-	y := g.pdf.GetY()
+	// Schriftgröße berechnen (mit AutoScale)
+	codeFontSize := g.calculateCodeFontSize(lineCount, maxLineLen)
+	lineHeight := codeFontSize * 0.35 // Reduzierter Zeilenabstand für kompaktere Darstellung
+
+	// Berechne wie viele Zeilen auf eine Seite passen
+	linesPerPage := int((availableHeight - 20) / lineHeight) // 20 für Padding im Rechteck
+	if linesPerPage < 5 {
+		linesPerPage = 5 // Mindestens 5 Zeilen pro Seite
+	}
+
+	// Seitenränder und Breite
 	left, _, right, _ := g.pdf.GetMargins()
 	w, _ := g.pdf.GetPageSize()
 	width := w - left - right
 
-	g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF")
-
-	if c.Language != "" {
-		g.safeSetFont("main", "B", 7)
-		g.pdf.SetTextColor(150, 150, 150)
-		labelW := g.pdf.GetStringWidth(c.Language) + 4
-		g.pdf.SetXY(x+width-labelW-2, y+2)
-		g.pdf.CellFormat(labelW, 4, g.prepareText(c.Language), "", 0, "R", false, 0, "")
+	// Code in Chunks aufteilen und rendern
+	totalChunks := (lineCount + linesPerPage - 1) / linesPerPage
+	if totalChunks < 1 {
+		totalChunks = 1
 	}
 
-	g.pdf.SetX(x + 5)
-	g.pdf.SetY(y + 5)
+	for chunkIdx := 0; chunkIdx < totalChunks; chunkIdx++ {
+		startLine := chunkIdx * linesPerPage
+		endLine := startLine + linesPerPage
+		if endLine > lineCount {
+			endLine = lineCount
+		}
+		chunkLines := allLines[startLine:endLine]
+		chunkLineCount := len(chunkLines)
 
-	for _, seg := range c.Segments {
-		if seg.Color != "" {
-			r, green, b := hexToRGB(seg.Color)
-			g.pdf.SetTextColor(r, green, b)
-		} else {
-			g.setPrimaryTextColor()
+		// Rechteckhöhe für diesen Chunk
+		rectHeight := float64(chunkLineCount)*lineHeight + 10
+
+		// Seitenumbruch prüfen
+		g.checkPageBreak(rectHeight + 10)
+
+		g.pdf.SetFillColor(bgR, bgG, bgB)
+		g.pdf.SetDrawColor(200, 200, 200)
+
+		x := g.pdf.GetX()
+		y := g.pdf.GetY()
+
+		// Rechteck zeichnen
+		g.pdf.RoundedRect(x, y, width, rectHeight, 4, "1234", "DF")
+
+		// Sprach-Label (nur beim ersten Chunk) oder Fortsetzungsmarkierung
+		if chunkIdx == 0 && c.Language != "" {
+			g.safeSetFont("main", "B", 7)
+			g.pdf.SetTextColor(150, 150, 150)
+			labelW := g.pdf.GetStringWidth(c.Language) + 4
+			g.pdf.SetXY(x+width-labelW-2, y+2)
+			g.pdf.CellFormat(labelW, 4, g.prepareText(c.Language), "", 0, "R", false, 0, "")
+		} else if chunkIdx > 0 {
+			// Fortsetzungsmarkierung
+			g.safeSetFont("main", "I", 6)
+			g.pdf.SetTextColor(150, 150, 150)
+			contLabel := fmt.Sprintf("... (Teil %d/%d)", chunkIdx+1, totalChunks)
+			labelW := g.pdf.GetStringWidth(contLabel) + 4
+			g.pdf.SetXY(x+width-labelW-2, y+2)
+			g.pdf.CellFormat(labelW, 4, g.prepareText(contLabel), "", 0, "R", false, 0, "")
 		}
 
-		text := seg.Text
-		for {
-			idx := -1
-			for i, r := range text {
-				if r == '\n' {
-					idx = i
-					break
+		// Code-Zeilen rendern mit Syntax-Highlighting
+		g.safeSetFont(fontFamily, "", codeFontSize)
+		g.pdf.SetX(x + 5)
+		g.pdf.SetY(y + 5)
+
+		for i, line := range chunkLines {
+			// Jedes Segment der Zeile mit seiner eigenen Farbe rendern
+			for _, seg := range line {
+				if seg.color != "" {
+					r, green, b := hexToRGB(seg.color)
+					g.pdf.SetTextColor(r, green, b)
+				} else {
+					g.setPrimaryTextColor()
+				}
+
+				if seg.text != "" {
+					g.safeWriteWithFontSize(lineHeight, seg.text, fontFamily, "", "", codeFontSize)
 				}
 			}
 
-			if idx == -1 {
-				if text != "" {
-					g.safeWrite(lineHeight, text, fontFamily, "", "")
-				}
-				break
-			}
-
-			if idx > 0 {
-				g.safeWrite(lineHeight, text[:idx], fontFamily, "", "")
-			}
-			g.pdf.Ln(lineHeight)
-			g.pdf.SetX(x + 5)
-			text = text[idx+1:]
-			if text == "" {
-				break
+			if i < len(chunkLines)-1 {
+				g.pdf.Ln(lineHeight)
+				g.pdf.SetX(x + 5)
 			}
 		}
+
+		g.pdf.SetY(y + rectHeight + 5)
+		g.pdf.Ln(2)
 	}
-	g.pdf.SetY(y + rectHeight + 5)
-	g.pdf.Ln(2)
 }
 
 // renderImage rendert ein Bild mit automatischer Skalierung und optionalem Titel.
+// Unterstützt konfigurierbare Breite und Skalierung über ImageBlock.Width und ImageBlock.Scale.
 func (g *Generator) renderImage(i blocks.ImageBlock) {
 	g.pdf.RegisterImage(i.Path, "")
 	info := g.pdf.GetImageInfo(i.Path)
@@ -389,7 +625,22 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 	maxWidth := w - left - right
 	maxPageHeight := h_page - top - bottom - 40
 
-	widthOnPage := maxWidth - 20
+	// Berechne Bildbreite basierend auf Konfiguration
+	var widthOnPage float64
+	if i.Width > 0 {
+		// Explizite Breite angegeben
+		widthOnPage = i.Width
+		if widthOnPage > maxWidth-20 {
+			widthOnPage = maxWidth - 20
+		}
+	} else if i.Scale > 0 && i.Scale != 1.0 {
+		// Skalierungsfaktor angegeben
+		widthOnPage = (maxWidth - 20) * i.Scale
+	} else {
+		// Standard: fast volle Breite
+		widthOnPage = maxWidth - 20
+	}
+
 	var h float64
 	if info != nil && info.Width() > 0 {
 		h = (info.Height() / info.Width()) * widthOnPage
@@ -444,17 +695,28 @@ func (g *Generator) renderImage(i blocks.ImageBlock) {
 
 // renderList rendert eine Aufzählung oder nummerierte Liste.
 func (g *Generator) renderList(l blocks.ListBlock) {
+	g.renderListWithIndent(l, 0)
+	g.pdf.Ln(5)
+}
+
+// renderListWithIndent rendert eine Liste mit der angegebenen Einrückungsebene.
+func (g *Generator) renderListWithIndent(l blocks.ListBlock, indentLevel int) {
 	g.safeSetFont("main", "", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 	lineHeight := g.getLineHeight()
+
+	baseIndent := 15.0
+	indentStep := 10.0
+	currentIndent := baseIndent + float64(indentLevel)*indentStep
 
 	for i, item := range l.Items {
 		prefix := "• "
 		if l.Ordered {
 			prefix = fmt.Sprintf("%d. ", i+1)
 		}
-		g.pdf.SetX(15)
+		g.pdf.SetX(currentIndent)
 		g.pdf.Write(lineHeight, g.prepareText(prefix))
+
 		for _, seg := range item.Content {
 			style := ""
 			if seg.Bold {
@@ -464,14 +726,85 @@ func (g *Generator) renderList(l blocks.ListBlock) {
 				style += "I"
 			}
 			g.safeSetFont("main", style, g.cfg.FontSize)
+
+			// Strikethrough: Position vor dem Text merken
+			startX := g.pdf.GetX()
+			startY := g.pdf.GetY()
+
 			g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
+
+			// Strikethrough-Linie zeichnen
+			if seg.Strikethrough {
+				endX := g.pdf.GetX()
+				strikeY := startY + g.cfg.FontSize*0.35
+				g.pdf.SetDrawColor(0, 0, 0)
+				g.pdf.SetLineWidth(0.3)
+				g.pdf.Line(startX, strikeY, endX, strikeY)
+			}
 		}
 		g.pdf.Ln(lineHeight + 2)
+
+		// Verschachtelte Liste rendern
+		if item.SubList != nil {
+			g.renderListWithIndent(*item.SubList, indentLevel+1)
+		}
 	}
+}
+
+// renderBlockquote rendert ein Zitat mit linkem Rand und Einrückung.
+func (g *Generator) renderBlockquote(b blocks.BlockquoteBlock) {
+	// Speichere aktuelle Position
+	left, _, _, _ := g.pdf.GetMargins()
+	startY := g.pdf.GetY()
+
+	// Einrückung für Blockquote
+	quoteIndent := 10.0
+	borderWidth := 2.0
+	borderColor := 150 // Grau
+
+	// Setze linken Rand für den Inhalt
+	g.pdf.SetLeftMargin(left + quoteIndent + borderWidth + 3)
+	g.pdf.SetX(left + quoteIndent + borderWidth + 3)
+
+	// Rendere den Inhalt des Blockquotes
+	for _, block := range b.Content {
+		switch content := block.(type) {
+		case blocks.ParagraphBlock:
+			// Blockquote-Text kursiv rendern
+			g.safeSetFont("main", "I", g.cfg.FontSize)
+			g.setPrimaryTextColor()
+			lineHeight := g.getLineHeight()
+
+			for _, seg := range content.Content {
+				style := "I" // Basis-Style ist kursiv
+				if seg.Bold {
+					style = "BI"
+				}
+				g.safeSetFont("main", style, g.cfg.FontSize)
+				if seg.Text != "" {
+					g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
+				}
+			}
+			g.pdf.Ln(lineHeight + 2)
+		case blocks.ListBlock:
+			g.renderList(content)
+		}
+	}
+
+	endY := g.pdf.GetY()
+
+	// Zeichne den linken Rand
+	g.pdf.SetDrawColor(borderColor, borderColor, borderColor)
+	g.pdf.SetLineWidth(borderWidth)
+	g.pdf.Line(left+quoteIndent, startY, left+quoteIndent, endY)
+
+	// Setze Margins zurück
+	g.pdf.SetLeftMargin(left)
 	g.pdf.Ln(5)
 }
 
 // renderTable rendert eine Tabelle mit Kopfzeile und automatischer Spaltenbreite.
+// Verbesserte Darstellung mit schöneren Rahmen, Padding und Zebra-Streifen.
 func (g *Generator) renderTable(t blocks.TableBlock) {
 	if len(t.Rows) == 0 {
 		return
@@ -486,24 +819,36 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	}
 	colWidth := width / float64(colCount)
 
+	// Tabellen-Styling Konstanten
+	cellPadding := 3.0
+	headerBgR, headerBgG, headerBgB := 230, 230, 240 // Leichtes Blau-Grau für Header
+	evenRowR, evenRowG, evenRowB := 250, 250, 252    // Sehr helles Grau für gerade Zeilen
+	oddRowR, oddRowG, oddRowB := 255, 255, 255       // Weiß für ungerade Zeilen
+	borderR, borderG, borderB := 200, 200, 210       // Dezente Rahmenfarbe
+
 	g.safeSetFont("main", "B", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 
+	rowIndex := 0
 	for _, row := range t.Rows {
+		// Berechne maximale Zeilenhöhe
 		maxH := 0.0
 		for _, cell := range row {
 			cellText := ""
 			for _, seg := range cell.Content {
 				cellText += seg.Text
 			}
-			h := float64(len(g.pdf.SplitLines([]byte(cellText), colWidth))) * (g.cfg.FontSize * 0.5)
+			lines := g.pdf.SplitLines([]byte(cellText), colWidth-2*cellPadding)
+			h := float64(len(lines)) * (g.cfg.FontSize * 0.5)
 			if h > maxH {
 				maxH = h
 			}
 		}
-		maxH += 4
+		maxH += 2 * cellPadding // Padding oben und unten
 
 		g.checkPageBreak(maxH)
+
+		isHeader := len(row) > 0 && row[0].Header
 
 		for i, cell := range row {
 			x, y := g.pdf.GetX(), g.pdf.GetY()
@@ -512,25 +857,45 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 				x = left
 			}
 
-			if cell.Header {
-				g.pdf.SetFillColor(240, 240, 240)
-				g.pdf.Rect(x, y, colWidth, maxH, "F")
+			// Hintergrundfarbe setzen
+			if cell.Header || isHeader {
+				g.pdf.SetFillColor(headerBgR, headerBgG, headerBgB)
 				g.safeSetFont("main", "B", g.cfg.FontSize)
 			} else {
+				// Zebra-Streifen für bessere Lesbarkeit
+				if rowIndex%2 == 0 {
+					g.pdf.SetFillColor(evenRowR, evenRowG, evenRowB)
+				} else {
+					g.pdf.SetFillColor(oddRowR, oddRowG, oddRowB)
+				}
 				g.safeSetFont("main", "", g.cfg.FontSize)
 			}
 
+			// Zelle mit Hintergrund zeichnen
+			g.pdf.Rect(x, y, colWidth, maxH, "F")
+
+			// Rahmen zeichnen
+			g.pdf.SetDrawColor(borderR, borderG, borderB)
+			g.pdf.SetLineWidth(0.3)
 			g.pdf.Rect(x, y, colWidth, maxH, "D")
 
+			// Text mit Padding rendern
 			cellText := ""
 			for _, seg := range cell.Content {
 				cellText += seg.Text
 			}
 
-			g.pdf.MultiCell(colWidth, g.cfg.FontSize*0.5, g.prepareText(cellText), "", "L", false)
+			g.setPrimaryTextColor()
+			g.pdf.SetXY(x+cellPadding, y+cellPadding)
+			g.pdf.MultiCell(colWidth-2*cellPadding, g.cfg.FontSize*0.5, g.prepareText(cellText), "", "L", false)
 			g.pdf.SetXY(x+colWidth, y)
 		}
 		g.pdf.Ln(maxH)
+
+		// Nur nicht-Header Zeilen für Zebra-Streifen zählen
+		if !isHeader {
+			rowIndex++
+		}
 	}
 	g.pdf.Ln(5)
 }

@@ -60,7 +60,7 @@ type model struct {
 	lastGeneratedPath  string
 }
 
-const totalInputs = 38
+const totalInputs = 54
 
 // keyMap definiert die Tastenkombinationen der TUI.
 type keyMap struct {
@@ -73,16 +73,19 @@ type keyMap struct {
 	Action     key.Binding
 	GlobalNext key.Binding
 	GlobalPrev key.Binding
+	PageDown   key.Binding
+	PageUp     key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Left, k.Right, k.GlobalNext, k.Quit}
+	return []key.Binding{k.Left, k.Right, k.PageDown, k.PageUp, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
-		{k.GlobalPrev, k.GlobalNext, k.Help, k.Quit, k.Action},
+		{k.PageDown, k.PageUp, k.GlobalPrev, k.GlobalNext},
+		{k.Help, k.Quit, k.Action},
 	}
 }
 
@@ -124,6 +127,14 @@ var keys = keyMap{
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "ausführen/wählen"),
 	),
+	PageDown: key.NewBinding(
+		key.WithKeys("pgdown", "ctrl+d"),
+		key.WithHelp("PgDn/ctrl+d", "runter scrollen"),
+	),
+	PageUp: key.NewBinding(
+		key.WithKeys("pgup", "ctrl+u"),
+		key.WithHelp("PgUp/ctrl+u", "hoch scrollen"),
+	),
 }
 
 // InitialModel erstellt das Startmodell für die TUI.
@@ -151,7 +162,7 @@ func InitialModel() *model {
 		initModel:          InitialInitModel("."),
 		customThemes:       []string{},
 		viewport:           viewport.New(100, 20),
-		configSectionsOpen: []bool{true, true, true, true, true, true, true},
+		configSectionsOpen: []bool{true, true, true, true, true, true, true, true, true, true, true},
 		logs:               []string{"Willkommen bei goDocGen!"},
 	}
 
@@ -389,9 +400,93 @@ func (m *model) setupInputs() {
 
 	// 37: Footer Style
 	t = textinput.New()
-	t.Placeholder = "Footer Style (fixed/inline)"
+	t.Placeholder = m.T(func(t translation) string { return t.footerStyle })
 	t.SetValue(m.cfg.Layout.FooterStyle)
 	m.inputs[37] = t
+
+	// 38-41: Erweiterte TOC-Einstellungen
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.tocLineSpacing })
+	t.SetValue(fmt.Sprintf("%.2f", m.cfg.TOC.LineSpacing))
+	m.inputs[38] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.tocBoldHeadings }) + " (true/false)"
+	t.SetValue(fmt.Sprintf("%t", m.cfg.TOC.BoldHeadings))
+	m.inputs[39] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.tocFontSize })
+	t.SetValue(fmt.Sprintf("%.1f", m.cfg.TOC.FontSize))
+	m.inputs[40] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.tocIndent })
+	t.SetValue(fmt.Sprintf("%.1f", m.cfg.TOC.Indent))
+	m.inputs[41] = t
+
+	// 42-46: Code-Einstellungen
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.codeFontSize })
+	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Code.FontSize))
+	m.inputs[42] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.codeMinFontSize })
+	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Code.MinFontSize))
+	m.inputs[43] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.codeAutoScale }) + " (true/false)"
+	t.SetValue(fmt.Sprintf("%t", m.cfg.Code.AutoScale))
+	m.inputs[44] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.codeMaxLines })
+	t.SetValue(fmt.Sprintf("%d", m.cfg.Code.MaxLines))
+	m.inputs[45] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.codeMaxLineLen })
+	t.SetValue(fmt.Sprintf("%d", m.cfg.Code.MaxLineLen))
+	m.inputs[46] = t
+
+	// 47-51: Farb-Einstellungen
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.colorTitle })
+	t.SetValue(m.cfg.Colors.Title)
+	m.inputs[47] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.colorHeader })
+	t.SetValue(m.cfg.Colors.Header)
+	m.inputs[48] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.colorBackground })
+	t.SetValue(m.cfg.Colors.Background)
+	m.inputs[49] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.colorText })
+	t.SetValue(m.cfg.Colors.Text)
+	m.inputs[50] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.colorAccent })
+	t.SetValue(m.cfg.Colors.Accent)
+	m.inputs[51] = t
+
+	// 52-53: Erweiterte Mermaid-Einstellungen
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.mermaidWidth })
+	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Mermaid.Width))
+	m.inputs[52] = t
+
+	t = textinput.New()
+	t.Placeholder = m.T(func(t translation) string { return t.mermaidScale })
+	t.SetValue(fmt.Sprintf("%.2f", m.cfg.Mermaid.Scale))
+	m.inputs[53] = t
 }
 
 func (m *model) applyIHKStandards() {
@@ -507,6 +602,52 @@ func (m *model) saveConfig() {
 	}
 
 	m.cfg.Layout.FooterStyle = m.inputs[37].Value()
+
+	// Erweiterte TOC-Einstellungen (38-41)
+	if v, err := strconv.ParseFloat(m.inputs[38].Value(), 64); err == nil {
+		m.cfg.TOC.LineSpacing = v
+	}
+	if v, err := strconv.ParseBool(m.inputs[39].Value()); err == nil {
+		m.cfg.TOC.BoldHeadings = v
+	}
+	if v, err := strconv.ParseFloat(m.inputs[40].Value(), 64); err == nil {
+		m.cfg.TOC.FontSize = v
+	}
+	if v, err := strconv.ParseFloat(m.inputs[41].Value(), 64); err == nil {
+		m.cfg.TOC.Indent = v
+	}
+
+	// Code-Einstellungen (42-46)
+	if v, err := strconv.ParseFloat(m.inputs[42].Value(), 64); err == nil {
+		m.cfg.Code.FontSize = v
+	}
+	if v, err := strconv.ParseFloat(m.inputs[43].Value(), 64); err == nil {
+		m.cfg.Code.MinFontSize = v
+	}
+	if v, err := strconv.ParseBool(m.inputs[44].Value()); err == nil {
+		m.cfg.Code.AutoScale = v
+	}
+	if v, err := strconv.Atoi(m.inputs[45].Value()); err == nil {
+		m.cfg.Code.MaxLines = v
+	}
+	if v, err := strconv.Atoi(m.inputs[46].Value()); err == nil {
+		m.cfg.Code.MaxLineLen = v
+	}
+
+	// Farb-Einstellungen (47-51)
+	m.cfg.Colors.Title = m.inputs[47].Value()
+	m.cfg.Colors.Header = m.inputs[48].Value()
+	m.cfg.Colors.Background = m.inputs[49].Value()
+	m.cfg.Colors.Text = m.inputs[50].Value()
+	m.cfg.Colors.Accent = m.inputs[51].Value()
+
+	// Erweiterte Mermaid-Einstellungen (52-53)
+	if v, err := strconv.ParseFloat(m.inputs[52].Value(), 64); err == nil {
+		m.cfg.Mermaid.Width = v
+	}
+	if v, err := strconv.ParseFloat(m.inputs[53].Value(), 64); err == nil {
+		m.cfg.Mermaid.Scale = v
+	}
 
 	err := m.cfg.Save(filepath.Join(m.projectPath, "docgen.yml"))
 	if err != nil {
@@ -802,6 +943,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+		case key.Matches(msg, m.keys.PageDown):
+			m.viewport.LineDown(5)
+			return m, nil
+		case key.Matches(msg, m.keys.PageUp):
+			m.viewport.LineUp(5)
+			return m, nil
 		}
 	case actionResultMsg:
 		m.statusMsg = string(msg)
@@ -1110,13 +1257,28 @@ func (m *model) configView() string {
 		indices []int
 		color   string
 	}{
+		// 1. Basis Information (Titel, Untertitel, Autor)
 		{m.T(func(t translation) string { return t.sectionBasis }), []int{0, 1, 2}, "#cba6f7"},
+		// 2. Layout & Abstände (Schriftgröße, Zeilenabstand, Ausrichtung, Ränder, Header-Nummerierung)
 		{m.T(func(t translation) string { return t.sectionLayout }), []int{3, 36, 15, 16, 4, 5, 6, 7, 32}, "#89b4fa"},
-		{m.T(func(t translation) string { return t.sectionHeader }), []int{10, 11, 12, 13, 33, 34, 35, 37}, "#f9e2af"},
+		// 3. Header (Header-Text, Header-Bild)
+		{m.T(func(t translation) string { return t.sectionHeader }), []int{10, 11}, "#f9e2af"},
+		// 4. Footer (Footer-Text, Footer-Bild, Footer-Designer Links/Mitte/Rechts, Footer-Style)
+		{m.T(func(t translation) string { return t.sectionFooter }), []int{12, 13, 33, 34, 35, 37}, "#94e2d5"},
+		// 5. Design & Theme (Seitenzahlen-Start, Theme, Code-Theme)
 		{m.T(func(t translation) string { return t.sectionDesign }), []int{14, 8, 9}, "#a6e3a1"},
-		{m.T(func(t translation) string { return t.sectionTOC }), []int{29, 30, 31}, "#fab387"},
+		// 6. Inhaltsverzeichnis (Aktiviert, Nummern, Punkte, Zeilenabstand, Fett, Schriftgröße, Einrückung)
+		{m.T(func(t translation) string { return t.sectionTOC }), []int{29, 30, 31, 38, 39, 40, 41}, "#fab387"},
+		// 7. Code-Blöcke (Schriftgröße, Min-Schriftgröße, Auto-Skalierung, Max-Zeilen, Max-Zeilenlänge)
+		{m.T(func(t translation) string { return t.sectionCode }), []int{42, 43, 44, 45, 46}, "#74c7ec"},
+		// 8. Farben (Überschriften, Header-Text, Hintergrund, Text, Akzent)
+		{m.T(func(t translation) string { return t.sectionColors }), []int{47, 48, 49, 50, 51}, "#f38ba8"},
+		// 9. Gradient/Farbverlauf (Aktiviert, Start, End, Orientierung, Global)
 		{m.T(func(t translation) string { return t.sectionGradient }), []int{17, 18, 19, 20, 21}, "#eba0ac"},
-		{m.T(func(t translation) string { return t.sectionFonts }), []int{22, 23, 24, 25, 26, 27, 28}, "#f5c2e7"},
+		// 10. Schriftarten (ZIP, URL, Regular, Bold, Italic, Mono)
+		{m.T(func(t translation) string { return t.sectionFonts }), []int{22, 23, 24, 25, 26, 27}, "#f5c2e7"},
+		// 11. Mermaid-Diagramme (Renderer, Breite, Skalierung)
+		{m.T(func(t translation) string { return t.sectionMermaid }), []int{28, 52, 53}, "#cdd6f4"},
 	}
 
 	for i, sec := range sections {

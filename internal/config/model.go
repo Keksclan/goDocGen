@@ -23,15 +23,20 @@ type Config struct {
 	Layout      Layout      `yaml:"layout"`                             // Layout-Vorgaben (Ränder, Ausrichtung)
 	Gradient    Gradient    `yaml:"gradient"`                           // Hintergrund-Farbverläufe
 	CodeTheme   string      `yaml:"code_theme"`                         // Theme für Code-Highlighting
+	Code        Code        `yaml:"code"`                               // Code-Block-Einstellungen
 	Mermaid     Mermaid     `yaml:"mermaid"`                            // Mermaid-Diagramm-Konfiguration
 	TOC         TOC         `yaml:"toc"`                                // Inhaltsverzeichnis-Einstellungen
 }
 
 // TOC definiert Einstellungen für das Inhaltsverzeichnis.
 type TOC struct {
-	Enabled     bool `yaml:"enabled"`      // Inhaltsverzeichnis anzeigen
-	ShowNumbers bool `yaml:"show_numbers"` // Nummern im TOC anzeigen
-	ShowDots    bool `yaml:"show_dots"`    // Punkte zwischen Text und Seite anzeigen
+	Enabled      bool    `yaml:"enabled"`       // Inhaltsverzeichnis anzeigen
+	ShowNumbers  bool    `yaml:"show_numbers"`  // Nummern im TOC anzeigen
+	ShowDots     bool    `yaml:"show_dots"`     // Punkte zwischen Text und Seite anzeigen
+	LineSpacing  float64 `yaml:"line_spacing"`  // Zeilenabstand im TOC (z.B. 1.0 für kompakt, 1.5 für mehr Abstand)
+	BoldHeadings bool    `yaml:"bold_headings"` // Überschriften fett darstellen
+	FontSize     float64 `yaml:"font_size"`     // Schriftgröße für TOC-Einträge (0 = Standard)
+	Indent       float64 `yaml:"indent"`        // Einrückung pro Level in mm (Standard: 8)
 }
 
 // Save speichert die Konfiguration in eine YAML-Datei.
@@ -111,5 +116,16 @@ type Margins struct {
 
 // Mermaid definiert Einstellungen für die Diagramm-Generierung.
 type Mermaid struct {
-	Renderer string `yaml:"renderer"` // Renderer-Typ ("mmdc" oder leer für Chrome-Fallback)
+	Renderer string  `yaml:"renderer"` // Renderer-Typ ("mmdc" oder leer für Chrome-Fallback)
+	Width    float64 `yaml:"width"`    // Breite der Diagramme in mm (0 = automatisch)
+	Scale    float64 `yaml:"scale"`    // Skalierungsfaktor für Diagramme (z.B. 0.8 für 80%)
+}
+
+// Code definiert Einstellungen für Code-Blöcke.
+type Code struct {
+	FontSize    float64 `yaml:"font_size"`     // Standard-Schriftgröße für Code (0 = nutzt globale FontSize)
+	MinFontSize float64 `yaml:"min_font_size"` // Minimale Schriftgröße bei AutoScale (Standard: 6)
+	AutoScale   bool    `yaml:"auto_scale"`    // Automatische Schriftgrößenanpassung für große Code-Blöcke
+	MaxLines    int     `yaml:"max_lines"`     // Ab dieser Zeilenanzahl wird skaliert (Standard: 30)
+	MaxLineLen  int     `yaml:"max_line_len"`  // Ab dieser Zeilenlänge wird skaliert (Standard: 80)
 }

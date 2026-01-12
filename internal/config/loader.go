@@ -276,6 +276,20 @@ func setDefaults(cfg *Config) {
 		cfg.CodeTheme = "catppuccin-latte"
 	}
 
+	// Font Defaults - Arial als Standard
+	if cfg.Fonts.Regular == "" {
+		cfg.Fonts.Regular = "Arial.ttf"
+	}
+	if cfg.Fonts.Bold == "" {
+		cfg.Fonts.Bold = "Arial-Bold.ttf"
+	}
+	if cfg.Fonts.Italic == "" {
+		cfg.Fonts.Italic = "Arial-Italic.ttf"
+	}
+	if cfg.Fonts.Mono == "" {
+		cfg.Fonts.Mono = "Courier.ttf"
+	}
+
 	// TOC Defaults
 	if !cfg.TOC.Enabled {
 		// Standardmäßig an, wenn nicht explizit aus
@@ -288,6 +302,22 @@ func setDefaults(cfg *Config) {
 	// Für jetzt setzen wir vernünftige Standards.
 	cfg.TOC.ShowNumbers = true
 	cfg.TOC.ShowDots = true
+	if cfg.TOC.LineSpacing == 0 {
+		cfg.TOC.LineSpacing = 1.0 // Kompakter Standard-Zeilenabstand
+	}
+	if cfg.TOC.FontSize == 0 {
+		cfg.TOC.FontSize = 11.0 // Etwas kleinere Schrift für kompakteres TOC
+	}
+	if cfg.TOC.Indent == 0 {
+		cfg.TOC.Indent = 6.0 // Kleinere Einrückung für kompakteres TOC
+	}
+	// BoldHeadings ist standardmäßig true für bessere Lesbarkeit
+	cfg.TOC.BoldHeadings = true
+
+	// Mermaid Defaults
+	if cfg.Mermaid.Scale == 0 {
+		cfg.Mermaid.Scale = 1.0 // Standardskalierung 100%
+	}
 
 	// Footer Defaults
 	if cfg.Footer.Left == "" && cfg.Footer.Center == "" && cfg.Footer.Right == "" {

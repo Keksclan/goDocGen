@@ -14,6 +14,10 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 	g.pdf.AddPage()
 	g.inTOC = false
 
+	// Berechne Zeilenhöhe basierend auf Konfiguration
+	baseFontSize := g.cfg.TOC.FontSize
+	baseLineHeight := baseFontSize * g.cfg.TOC.LineSpacing * 0.6
+
 	if isMeasurement {
 		if len(g.toc) == 0 {
 			// Falls noch keine Einträge da sind (erster Lauf), reservieren wir eine Seite
@@ -24,12 +28,12 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		// Im ersten Durchgang messen wir, wie viele Seiten das TOC tatsächlich einnimmt
 		g.pdf.SetY(40)
 		g.pdf.Ln(15) // Titel
-		g.pdf.Ln(10) // Linie
+		g.pdf.Ln(8)  // Linie (kompakter)
 
 		for _, entry := range g.toc {
-			h := 8.5
-			if entry.Level == 1 {
-				h = 10.5
+			h := baseLineHeight
+			if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
+				h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
 			}
 			g.checkPageBreak(h)
 			g.pdf.Ln(h)
@@ -51,25 +55,33 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 	g.pdf.SetDrawColor(r, green, b)
 	g.pdf.SetLineWidth(0.5)
 	g.pdf.Line(left, g.pdf.GetY(), w-right, g.pdf.GetY())
-	g.pdf.Ln(10)
+	g.pdf.Ln(8) // Kompakterer Abstand nach der Linie
 
 	g.setPrimaryTextColor()
 
 	for _, entry := range g.toc {
-		indent := float64((entry.Level - 1) * 8)
+		// Konfigurierbare Einrückung
+		indent := float64(entry.Level-1) * g.cfg.TOC.Indent
 		g.pdf.SetX(left + indent)
 
-		fontSize := 12.0
-		h := 8.5
+		// Konfigurierbare Schriftgröße und Zeilenhöhe
+		fontSize := baseFontSize
+		h := baseLineHeight
 		style := ""
-		if entry.Level == 1 {
+
+		// Bold für Level 1 wenn konfiguriert
+		if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
 			style = "B"
-			g.safeSetFont("main", style, 12)
-			g.pdf.Ln(1)
-			h = 10.5
+			g.safeSetFont("main", style, fontSize)
+			h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
 		} else {
-			g.safeSetFont("main", "", 11)
-			fontSize = 11.0
+			// Kleinere Schrift für Unterebenen
+			subFontSize := fontSize - float64(entry.Level-1)*0.5
+			if subFontSize < fontSize-2 {
+				subFontSize = fontSize - 2
+			}
+			g.safeSetFont("main", "", subFontSize)
+			fontSize = subFontSize
 		}
 
 		text := ""
@@ -83,7 +95,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 
 		// Punkte zwischen Text und Seitenzahl
 		if g.cfg.TOC.ShowDots {
-			g.safeSetFont("main", "", 10)
+			g.safeSetFont("main", "", fontSize-1)
 			g.pdf.SetTextColor(180, 180, 180)
 			dotX := g.pdf.GetX() + 2
 			dotEndX := w - right - 10
@@ -121,20 +133,23 @@ func (g *Generator) measureTOC() int {
 		return 0
 	}
 
+	// Berechne Zeilenhöhe basierend auf Konfiguration
+	baseFontSize := g.cfg.TOC.FontSize
+	baseLineHeight := baseFontSize * g.cfg.TOC.LineSpacing * 0.6
+
 	_, top, _, bottom := g.pdf.GetMargins()
-	_, h := g.pdf.GetPageSize()
-	usableHeight := h - top - bottom
+	_, pageH := g.pdf.GetPageSize()
+	usableHeight := pageH - top - bottom
 
 	currentY := 40.0 // Start Y laut renderTOC
 	currentY += 15.0 // Titel Höhe
-	currentY += 10.0 // Linie und Abstand
+	currentY += 8.0  // Linie und Abstand (kompakter)
 
 	pages := 1
 	for _, entry := range g.toc {
-		h := 8.5
-		if entry.Level == 1 {
-			h = 10.5
-			currentY += 1.0 // Extra-Abstand für Top-Level laut renderTOC
+		h := baseLineHeight
+		if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
+			h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
 		}
 
 		// checkPageBreak Logik simulieren

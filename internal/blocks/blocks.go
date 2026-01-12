@@ -26,18 +26,21 @@ func (p ParagraphBlock) IsBlock() {}
 
 // TextSegment repräsentiert einen Teil eines Textes mit Formatierung.
 type TextSegment struct {
-	Text   string // Textinhalt
-	Italic bool   // Kursiv
-	Bold   bool   // Fett
-	Code   bool   // Inline-Code
-	Link   string // URL oder lokaler Pfad
+	Text          string // Textinhalt
+	Italic        bool   // Kursiv
+	Bold          bool   // Fett
+	Strikethrough bool   // Durchgestrichen
+	Code          bool   // Inline-Code
+	Link          string // URL oder lokaler Pfad
 }
 
 // ImageBlock repräsentiert ein Bild.
 type ImageBlock struct {
-	Path  string // Dateipfad zum Bild
-	Alt   string // Alternativtext
-	Title string // Optionaler Bildtitel
+	Path  string  // Dateipfad zum Bild
+	Alt   string  // Alternativtext
+	Title string  // Optionaler Bildtitel
+	Width float64 // Optionale Breite in mm (0 = automatisch)
+	Scale float64 // Optionaler Skalierungsfaktor (z.B. 0.8 für 80%)
 }
 
 func (i ImageBlock) IsBlock() {}
@@ -71,12 +74,20 @@ func (l ListBlock) IsBlock() {}
 // ListItem repräsentiert einen einzelnen Listeneintrag.
 type ListItem struct {
 	Content []TextSegment
+	SubList *ListBlock // Optionale verschachtelte Liste
 }
 
 // PageBreakBlock erzwingt einen Seitenumbruch im Dokument.
 type PageBreakBlock struct{}
 
 func (p PageBreakBlock) IsBlock() {}
+
+// BlockquoteBlock repräsentiert ein Zitat (Blockquote).
+type BlockquoteBlock struct {
+	Content []DocBlock // Inhalt des Zitats (kann Paragraphen, Listen etc. enthalten)
+}
+
+func (b BlockquoteBlock) IsBlock() {}
 
 // TableBlock repräsentiert eine Tabelle.
 type TableBlock struct {

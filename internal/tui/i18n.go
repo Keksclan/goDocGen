@@ -32,17 +32,39 @@ type translation struct {
 	sectionBasis    string
 	sectionLayout   string
 	sectionHeader   string
+	sectionFooter   string
 	sectionDesign   string
 	sectionGradient string
 	sectionFonts    string
 	sectionTOC      string
+	sectionCode     string
+	sectionColors   string
+	sectionMermaid  string
 	tocEnabled      string
 	tocNumbers      string
 	tocDots         string
+	tocLineSpacing  string
+	tocBoldHeadings string
+	tocFontSize     string
+	tocIndent       string
 	headerNumbering string
 	footerLeft      string
 	footerCenter    string
 	footerRight     string
+	footerStyle     string
+	codeFontSize    string
+	codeMinFontSize string
+	codeAutoScale   string
+	codeMaxLines    string
+	codeMaxLineLen  string
+	colorTitle      string
+	colorHeader     string
+	colorBackground string
+	colorText       string
+	colorAccent     string
+	mermaidRenderer string
+	mermaidWidth    string
+	mermaidScale    string
 }
 
 var translations = map[string]translation{
@@ -76,19 +98,41 @@ var translations = map[string]translation{
 		pressEToEdit:    "Drücke 'E' zum Bearbeiten",
 		editMode:        "BEARBEITUNGS-MODUS",
 		sectionBasis:    "📁 Basis Information",
-		sectionLayout:   "📏 Layout & Font",
-		sectionHeader:   "🔝 Header & Footer",
-		sectionDesign:   "📑 Seitenzahlen & Design",
+		sectionLayout:   "📏 Layout & Abstände",
+		sectionHeader:   "🔝 Header",
+		sectionFooter:   "🔻 Footer",
+		sectionDesign:   "🎨 Design & Theme",
 		sectionGradient: "🌈 Gradient (Farbverlauf)",
-		sectionFonts:    "🔡 Fonts & Mermaid",
-		sectionTOC:      "📑 Inhaltsverzeichnis (TOC)",
+		sectionFonts:    "🔡 Schriftarten",
+		sectionTOC:      "📑 Inhaltsverzeichnis",
+		sectionCode:     "💻 Code-Blöcke",
+		sectionColors:   "🎨 Farben",
+		sectionMermaid:  "📊 Mermaid-Diagramme",
 		tocEnabled:      "TOC Aktiviert",
-		tocNumbers:      "TOC Nummern",
-		tocDots:         "TOC Punkte",
+		tocNumbers:      "Nummern anzeigen",
+		tocDots:         "Punkte anzeigen",
+		tocLineSpacing:  "Zeilenabstand",
+		tocBoldHeadings: "Fett darstellen",
+		tocFontSize:     "Schriftgröße",
+		tocIndent:       "Einrückung (mm)",
 		headerNumbering: "Header Nummerierung",
-		footerLeft:      "Footer Links",
-		footerCenter:    "Footer Mitte",
-		footerRight:     "Footer Rechts",
+		footerLeft:      "Links",
+		footerCenter:    "Mitte",
+		footerRight:     "Rechts",
+		footerStyle:     "Style (fixed/inline)",
+		codeFontSize:    "Schriftgröße",
+		codeMinFontSize: "Min. Schriftgröße",
+		codeAutoScale:   "Auto-Skalierung",
+		codeMaxLines:    "Max. Zeilen",
+		codeMaxLineLen:  "Max. Zeilenlänge",
+		colorTitle:      "Überschriften",
+		colorHeader:     "Header-Text",
+		colorBackground: "Hintergrund",
+		colorText:       "Text",
+		colorAccent:     "Akzent",
+		mermaidRenderer: "Renderer",
+		mermaidWidth:    "Breite (mm)",
+		mermaidScale:    "Skalierung",
 	},
 	"en": {
 		helpTab:         "📖 Help",
@@ -120,19 +164,41 @@ var translations = map[string]translation{
 		pressEToEdit:    "Press 'E' to edit",
 		editMode:        "EDIT MODE",
 		sectionBasis:    "📁 Basic Information",
-		sectionLayout:   "📏 Layout & Font",
-		sectionHeader:   "🔝 Header & Footer",
-		sectionDesign:   "📑 Page Numbers & Design",
+		sectionLayout:   "📏 Layout & Spacing",
+		sectionHeader:   "🔝 Header",
+		sectionFooter:   "🔻 Footer",
+		sectionDesign:   "🎨 Design & Theme",
 		sectionGradient: "🌈 Gradient (Background)",
-		sectionFonts:    "🔡 Fonts & Mermaid",
-		sectionTOC:      "📑 Table of Contents (TOC)",
+		sectionFonts:    "🔡 Fonts",
+		sectionTOC:      "📑 Table of Contents",
+		sectionCode:     "💻 Code Blocks",
+		sectionColors:   "🎨 Colors",
+		sectionMermaid:  "📊 Mermaid Diagrams",
 		tocEnabled:      "TOC Enabled",
-		tocNumbers:      "TOC Numbers",
-		tocDots:         "TOC Dots",
+		tocNumbers:      "Show Numbers",
+		tocDots:         "Show Dots",
+		tocLineSpacing:  "Line Spacing",
+		tocBoldHeadings: "Bold Headings",
+		tocFontSize:     "Font Size",
+		tocIndent:       "Indent (mm)",
 		headerNumbering: "Header Numbering",
-		footerLeft:      "Footer Left",
-		footerCenter:    "Footer Center",
-		footerRight:     "Footer Right",
+		footerLeft:      "Left",
+		footerCenter:    "Center",
+		footerRight:     "Right",
+		footerStyle:     "Style (fixed/inline)",
+		codeFontSize:    "Font Size",
+		codeMinFontSize: "Min. Font Size",
+		codeAutoScale:   "Auto Scale",
+		codeMaxLines:    "Max. Lines",
+		codeMaxLineLen:  "Max. Line Length",
+		colorTitle:      "Headings",
+		colorHeader:     "Header Text",
+		colorBackground: "Background",
+		colorText:       "Text",
+		colorAccent:     "Accent",
+		mermaidRenderer: "Renderer",
+		mermaidWidth:    "Width (mm)",
+		mermaidScale:    "Scale",
 	},
 }
 
