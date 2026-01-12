@@ -31,6 +31,10 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		g.pdf.Ln(8)  // Linie (kompakter)
 
 		for _, entry := range g.toc {
+			// Wenn OnlyNumbered aktiv ist, nur nummerierte Einträge anzeigen
+			if g.cfg.TOC.OnlyNumbered && entry.Number == "" {
+				continue
+			}
 			h := baseLineHeight
 			if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
 				h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
@@ -60,6 +64,10 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 	g.setPrimaryTextColor()
 
 	for _, entry := range g.toc {
+		// Wenn OnlyNumbered aktiv ist, nur nummerierte Einträge anzeigen
+		if g.cfg.TOC.OnlyNumbered && entry.Number == "" {
+			continue
+		}
 		// Konfigurierbare Einrückung
 		indent := float64(entry.Level-1) * g.cfg.TOC.Indent
 		g.pdf.SetX(left + indent)
@@ -147,6 +155,10 @@ func (g *Generator) measureTOC() int {
 
 	pages := 1
 	for _, entry := range g.toc {
+		// Wenn OnlyNumbered aktiv ist, nur nummerierte Einträge zählen
+		if g.cfg.TOC.OnlyNumbered && entry.Number == "" {
+			continue
+		}
 		h := baseLineHeight
 		if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
 			h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften

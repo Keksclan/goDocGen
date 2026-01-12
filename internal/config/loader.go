@@ -251,8 +251,8 @@ func setDefaults(cfg *Config) {
 	if cfg.Layout.Body == "" {
 		cfg.Layout.Body = "justify"
 	}
-	// Default: Nummerierung an
-	cfg.Layout.HeaderNumbering = true
+	// HeaderNumbering: Standardwert ist false (keine automatische Nummerierung)
+	// Der Wert aus der YAML-Datei wird nicht überschrieben
 
 	if cfg.Layout.Margins.Left == 0 {
 		cfg.Layout.Margins.Left = 25
@@ -291,17 +291,10 @@ func setDefaults(cfg *Config) {
 	}
 
 	// TOC Defaults
-	if !cfg.TOC.Enabled {
-		// Standardmäßig an, wenn nicht explizit aus
-		cfg.TOC.Enabled = true
-	}
-	// Wir können hier nicht einfach auf false prüfen, da bool default false ist.
-	// In Go ist es schwer zu unterscheiden zwischen "nicht gesetzt" und "false gesetzt" bei bools ohne Zeiger.
-	// Aber für TOC.Enabled wollen wir meistens true.
-	// Eigentlich sollten wir in der docgen.yml schauen, ob es da ist.
-	// Für jetzt setzen wir vernünftige Standards.
-	cfg.TOC.ShowNumbers = true
-	cfg.TOC.ShowDots = true
+	// Hinweis: Bool-Werte wie Enabled, ShowNumbers, ShowDots, OnlyNumbered werden nicht überschrieben,
+	// da wir nicht unterscheiden können ob sie explizit auf false gesetzt wurden oder nicht gesetzt sind.
+	// Der Standardwert für bool in Go ist false, was für die meisten Fälle passt.
+	// Wenn der User TOC aktivieren will, muss er enabled: true setzen.
 	if cfg.TOC.LineSpacing == 0 {
 		cfg.TOC.LineSpacing = 1.0 // Kompakter Standard-Zeilenabstand
 	}
@@ -311,8 +304,7 @@ func setDefaults(cfg *Config) {
 	if cfg.TOC.Indent == 0 {
 		cfg.TOC.Indent = 6.0 // Kleinere Einrückung für kompakteres TOC
 	}
-	// BoldHeadings ist standardmäßig true für bessere Lesbarkeit
-	cfg.TOC.BoldHeadings = true
+	// BoldHeadings: Standardwert ist false (wird aus YAML gelesen)
 
 	// Mermaid Defaults
 	if cfg.Mermaid.Scale == 0 {

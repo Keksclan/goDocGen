@@ -109,58 +109,66 @@ func (g *Generator) safeSetFont(family string, style string, size float64) {
 }
 
 // renderHeading rendert eine Überschrift mit automatischer Nummerierung und Inhaltsverzeichniseintrag.
+// Überschriften mit ExcludeFromTOC=true werden ohne Nummerierung gerendert und nicht im TOC angezeigt.
 func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
-	if h.Level > 0 && h.Level <= len(g.headingCounts) {
-		g.headingCounts[h.Level-1]++
-		for i := h.Level; i < len(g.headingCounts); i++ {
-			g.headingCounts[i] = 0
+	// Heading-Zähler nur erhöhen wenn die Überschrift NICHT vom TOC ausgeschlossen ist
+	// So wird die Nummerierung für normale Überschriften nicht beeinflusst
+	if !h.ExcludeFromTOC {
+		if h.Level > 0 && h.Level <= len(g.headingCounts) {
+			g.headingCounts[h.Level-1]++
+			for i := h.Level; i < len(g.headingCounts); i++ {
+				g.headingCounts[i] = 0
+			}
 		}
 	}
 
 	numbering := ""
 	text := h.Text
 
-	// Versuche Nummerierung aus dem Text zu extrahieren
-	extractedNum, remainingText := splitNumberingAndText(text)
+	// Keine Nummerierung für ausgeschlossene Überschriften
+	if !h.ExcludeFromTOC {
+		// Versuche Nummerierung aus dem Text zu extrahieren
+		extractedNum, remainingText := splitNumberingAndText(text)
 
-	if extractedNum != "" {
-		// Wenn im Text eine Nummerierung gefunden wurde, verwenden wir diese bevorzugt
-		numbering = extractedNum
-		text = remainingText
-	} else if g.cfg.Layout.HeaderNumbering {
-		// Ansonsten automatische Nummerierung, falls aktiviert
-		if h.ParentNumbering != "" {
-			numbering = h.ParentNumbering
-			// Wir verwenden Punkte für die Hierarchie (1.1.1)
-			if !strings.HasSuffix(numbering, ".") && numbering != "" {
-				numbering += "."
-			}
+		if extractedNum != "" {
+			// Wenn im Text eine Nummerierung gefunden wurde, verwenden wir diese bevorzugt
+			numbering = extractedNum
+			text = remainingText
+		} else if g.cfg.Layout.HeaderNumbering {
+			// Ansonsten automatische Nummerierung, falls aktiviert
+			if h.ParentNumbering != "" {
+				numbering = h.ParentNumbering
+				// Wir verwenden Punkte für die Hierarchie (1.1.1)
+				if !strings.HasSuffix(numbering, ".") && numbering != "" {
+					numbering += "."
+				}
 
-			// Wir hängen nur an, wenn ParentNumbering nicht schon die Nummer für diesen Header ist
-			// In der neuen Logik ist ParentNumbering oft die Nummer des ersten Headers der Datei
-			if h.Level > 1 {
-				for i := 1; i < h.Level; i++ {
+				// Wir hängen nur an, wenn ParentNumbering nicht schon die Nummer für diesen Header ist
+				// In der neuen Logik ist ParentNumbering oft die Nummer des ersten Headers der Datei
+				if h.Level > 1 {
+					for i := 1; i < h.Level; i++ {
+						count := g.headingCounts[i]
+						if count == 0 {
+							count = 1
+						}
+						numbering += fmt.Sprintf("%d", count)
+						if i < h.Level-1 {
+							numbering += "."
+						}
+					}
+				}
+				if numbering != "" && !strings.HasSuffix(numbering, ".") {
+					numbering += "."
+				}
+			} else {
+				// Klassische hierarchische Nummerierung
+				for i := 0; i < h.Level; i++ {
 					count := g.headingCounts[i]
 					if count == 0 {
 						count = 1
 					}
-					numbering += fmt.Sprintf("%d", count)
-					if i < h.Level-1 {
-						numbering += "."
-					}
+					numbering += fmt.Sprintf("%d.", count)
 				}
-			}
-			if numbering != "" && !strings.HasSuffix(numbering, ".") {
-				numbering += "."
-			}
-		} else {
-			// Klassische hierarchische Nummerierung
-			for i := 0; i < h.Level; i++ {
-				count := g.headingCounts[i]
-				if count == 0 {
-					count = 1
-				}
-				numbering += fmt.Sprintf("%d.", count)
 			}
 		}
 	}
@@ -170,7 +178,14 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 
 	link := g.pdf.AddLink()
-	if isMeasurement {
+
+	// Anchor-Link registrieren für interne Verlinkungen
+	if h.AnchorID != "" {
+		g.anchorLinks[h.AnchorID] = link
+	}
+
+	// Nur zum TOC hinzufügen wenn nicht ausgeschlossen
+	if isMeasurement && !h.ExcludeFromTOC {
 		// Berechne globales Level für korrekte Einrückung im TOC
 		globalLevel := h.Level
 		if h.ParentNumbering != "" {
@@ -180,11 +195,12 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 		}
 
 		g.toc = append(g.toc, TOCEntry{
-			Level:  globalLevel,
-			Number: numbering,
-			Text:   text,
-			Page:   g.pdf.PageNo(),
-			Link:   link,
+			Level:    globalLevel,
+			Number:   numbering,
+			Text:     text,
+			Page:     g.pdf.PageNo(),
+			Link:     link,
+			AnchorID: h.AnchorID,
 		})
 	}
 	g.pdf.SetLink(link, g.pdf.GetY(), -1)
@@ -276,7 +292,20 @@ func (g *Generator) safeWriteWithFontSize(size float64, text string, family stri
 	}()
 
 	if link != "" {
-		g.pdf.WriteLinkString(size, g.prepareText(text), link)
+		// Prüfen ob es ein Anchor-Link ist (beginnt mit #)
+		if strings.HasPrefix(link, "#") {
+			anchorID := strings.TrimPrefix(link, "#")
+			if linkID, ok := g.anchorLinks[anchorID]; ok {
+				// Interner Link zu einer Überschrift
+				g.pdf.WriteLinkID(size, g.prepareText(text), linkID)
+			} else {
+				// Anchor nicht gefunden, als normalen Text rendern
+				g.pdf.Write(size, g.prepareText(text))
+			}
+		} else {
+			// Externer Link (URL)
+			g.pdf.WriteLinkString(size, g.prepareText(text), link)
+		}
 	} else {
 		g.pdf.Write(size, g.prepareText(text))
 	}
@@ -333,16 +362,40 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 			if g.cfg.Fonts.Mono != "" {
 				fontFamily = "mono"
 			}
-			// Inline-Code verwendet Code-Schriftgröße (getrennt von normaler Schriftgröße)
+			// Inline-Code verwendet eine etwas kleinere Schriftgröße als normaler Text
 			codeFontSize := g.cfg.Code.FontSize
 			if codeFontSize <= 0 {
-				codeFontSize = 6.0 // Standard für Code (kleiner für kompaktere Darstellung)
+				codeFontSize = g.cfg.FontSize * 0.9 // 90% der normalen Schriftgröße für bessere Lesbarkeit
 			}
 			g.safeSetFont(fontFamily, "", codeFontSize)
-			g.pdf.SetFillColor(240, 240, 240)
+
 			if seg.Text != "" {
+				// Berechne Textbreite für den Hintergrund-Chip
+				textWidth := g.pdf.GetStringWidth(g.prepareText(seg.Text))
+				chipPaddingH := 2.5              // Horizontales Padding (links und rechts)
+				chipPaddingV := 1.2              // Vertikales Padding (oben und unten)
+				chipHeight := codeFontSize * 0.5 // Höhe basierend auf Schriftgröße
+
+				// Position merken
+				startX := g.pdf.GetX()
+				startY := g.pdf.GetY()
+
+				// Moderner Hintergrund-Chip (sanftes Grau, ohne sichtbaren Rahmen)
+				g.pdf.SetFillColor(243, 244, 246)                          // Sanftes Grau (wie Tailwind gray-100)
+				chipY := startY + (lineHeight-chipHeight-2*chipPaddingV)/2 // Vertikal zentrieren
+				g.pdf.RoundedRect(startX, chipY, textWidth+2*chipPaddingH, chipHeight+2*chipPaddingV, 1.5, "1234", "F")
+
+				// Text auf dem Chip schreiben
+				g.pdf.SetX(startX + chipPaddingH)
+				g.pdf.SetTextColor(55, 65, 81) // Dunkles Grau für Code-Text (wie Tailwind gray-700)
 				codeLineHeight := codeFontSize * 0.5
 				g.safeWriteWithFontSize(codeLineHeight, seg.Text, fontFamily, "", seg.Link, codeFontSize)
+
+				// Position nach dem Chip setzen (mit etwas Abstand)
+				g.pdf.SetX(startX + textWidth + 2*chipPaddingH + 1.5)
+
+				// Textfarbe zurücksetzen für nachfolgenden Text
+				g.setPrimaryTextColor()
 			}
 		} else {
 			g.safeSetFont("main", style, g.cfg.FontSize)
@@ -705,8 +758,10 @@ func (g *Generator) renderListWithIndent(l blocks.ListBlock, indentLevel int) {
 	g.setPrimaryTextColor()
 	lineHeight := g.getLineHeight()
 
-	baseIndent := 15.0
-	indentStep := 10.0
+	// Basis-Einrückung entspricht dem linken Margin für konsistente Ausrichtung mit normalem Text
+	left, _, _, _ := g.pdf.GetMargins()
+	baseIndent := left
+	indentStep := 8.0 // Einrückung pro Verschachtelungsebene
 	currentIndent := baseIndent + float64(indentLevel)*indentStep
 
 	for i, item := range l.Items {
@@ -718,28 +773,66 @@ func (g *Generator) renderListWithIndent(l blocks.ListBlock, indentLevel int) {
 		g.pdf.Write(lineHeight, g.prepareText(prefix))
 
 		for _, seg := range item.Content {
-			style := ""
-			if seg.Bold {
-				style += "B"
-			}
-			if seg.Italic {
-				style += "I"
-			}
-			g.safeSetFont("main", style, g.cfg.FontSize)
+			if seg.Code {
+				// Inline-Code mit Hintergrund-Chip rendern
+				fontFamily := "main"
+				if g.cfg.Fonts.Mono != "" {
+					fontFamily = "mono"
+				}
+				codeFontSize := g.cfg.Code.FontSize
+				if codeFontSize <= 0 {
+					codeFontSize = g.cfg.FontSize * 0.9 // 90% der normalen Schriftgröße für bessere Lesbarkeit
+				}
+				g.safeSetFont(fontFamily, "", codeFontSize)
 
-			// Strikethrough: Position vor dem Text merken
-			startX := g.pdf.GetX()
-			startY := g.pdf.GetY()
+				if seg.Text != "" {
+					textWidth := g.pdf.GetStringWidth(g.prepareText(seg.Text))
+					chipPaddingH := 2.5              // Horizontales Padding (links und rechts)
+					chipPaddingV := 1.2              // Vertikales Padding (oben und unten)
+					chipHeight := codeFontSize * 0.5 // Höhe basierend auf Schriftgröße
 
-			g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
+					startX := g.pdf.GetX()
+					startY := g.pdf.GetY()
 
-			// Strikethrough-Linie zeichnen
-			if seg.Strikethrough {
-				endX := g.pdf.GetX()
-				strikeY := startY + g.cfg.FontSize*0.35
-				g.pdf.SetDrawColor(0, 0, 0)
-				g.pdf.SetLineWidth(0.3)
-				g.pdf.Line(startX, strikeY, endX, strikeY)
+					// Moderner Hintergrund-Chip (sanftes Grau, ohne sichtbaren Rahmen)
+					g.pdf.SetFillColor(243, 244, 246)                          // Sanftes Grau (wie Tailwind gray-100)
+					chipY := startY + (lineHeight-chipHeight-2*chipPaddingV)/2 // Vertikal zentrieren
+					g.pdf.RoundedRect(startX, chipY, textWidth+2*chipPaddingH, chipHeight+2*chipPaddingV, 1.5, "1234", "F")
+
+					g.pdf.SetX(startX + chipPaddingH)
+					g.pdf.SetTextColor(55, 65, 81) // Dunkles Grau für Code-Text (wie Tailwind gray-700)
+					codeLineHeight := codeFontSize * 0.5
+					g.safeWriteWithFontSize(codeLineHeight, seg.Text, fontFamily, "", seg.Link, codeFontSize)
+
+					g.pdf.SetX(startX + textWidth + 2*chipPaddingH + 1.5)
+
+					// Textfarbe zurücksetzen für nachfolgenden Text
+					g.setPrimaryTextColor()
+				}
+			} else {
+				style := ""
+				if seg.Bold {
+					style += "B"
+				}
+				if seg.Italic {
+					style += "I"
+				}
+				g.safeSetFont("main", style, g.cfg.FontSize)
+
+				// Strikethrough: Position vor dem Text merken
+				startX := g.pdf.GetX()
+				startY := g.pdf.GetY()
+
+				g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
+
+				// Strikethrough-Linie zeichnen
+				if seg.Strikethrough {
+					endX := g.pdf.GetX()
+					strikeY := startY + g.cfg.FontSize*0.35
+					g.pdf.SetDrawColor(0, 0, 0)
+					g.pdf.SetLineWidth(0.3)
+					g.pdf.Line(startX, strikeY, endX, strikeY)
+				}
 			}
 		}
 		g.pdf.Ln(lineHeight + 2)

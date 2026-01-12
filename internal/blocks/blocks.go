@@ -13,6 +13,8 @@ type HeadingBlock struct {
 	Level           int    // Ebene der Überschrift (1-6)
 	Text            string // Textinhalt
 	ParentNumbering string // Basis-Nummerierung aus der Ordnerstruktur (z.B. "1.1_")
+	AnchorID        string // Eindeutige ID für Anchor-Links (z.B. "einführung-in-docgen")
+	ExcludeFromTOC  bool   // Wenn true, wird die Überschrift nicht im TOC angezeigt und nicht nummeriert (Syntax: !#! oder !##!)
 }
 
 func (h HeadingBlock) IsBlock() {}

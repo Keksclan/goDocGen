@@ -23,15 +23,17 @@ type Generator struct {
 	registeredFonts   map[string]bool   // Verfolgt bereits registrierte Schriftarten
 	inTOC             bool              // Status, ob gerade das Inhaltsverzeichnis gerendert wird
 	currentFontIsUTF8 bool              // Status, ob die aktuelle Schriftart UTF-8 unterstützt
+	anchorLinks       map[string]int    // Map von AnchorID zu PDF-Link-ID für interne Verlinkungen
 }
 
 // TOCEntry repräsentiert einen Eintrag im Inhaltsverzeichnis.
 type TOCEntry struct {
-	Level  int    // Ebene der Überschrift (1-6)
-	Number string // Hierarchische Nummer (z.B. 1.2.3)
-	Text   string // Text der Überschrift
-	Page   int    // Seitenzahl
-	Link   int    // Interner PDF-Link zur Zielseite
+	Level    int    // Ebene der Überschrift (1-6)
+	Number   string // Hierarchische Nummer (z.B. 1.2.3)
+	Text     string // Text der Überschrift
+	Page     int    // Seitenzahl
+	Link     int    // Interner PDF-Link zur Zielseite
+	AnchorID string // Eindeutige ID für Anchor-Links (z.B. "einfuehrung-in-docgen")
 }
 
 // NewGenerator erstellt einen neuen PDF-Generator.
@@ -48,6 +50,7 @@ func NewGenerator(cfg *config.Config, blocks []blocks.DocBlock, fontDir string) 
 		fontDir:         fontDir,
 		headingCounts:   make([]int, 6),
 		registeredFonts: make(map[string]bool),
+		anchorLinks:     make(map[string]int),
 	}
 
 	// Schriften beim Initialisieren registrieren
@@ -225,6 +228,7 @@ func (g *Generator) Generate(outputPath string) error {
 	g.registeredFonts = make(map[string]bool)
 	g.registerFonts(g.fontDir)
 	g.headingCounts = make([]int, 6)
+	g.anchorLinks = make(map[string]int)
 
 	// Durchgang 2: Finales Rendern
 	g.renderAll(false)

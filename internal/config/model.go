@@ -37,6 +37,7 @@ type TOC struct {
 	BoldHeadings bool    `yaml:"bold_headings"` // Überschriften fett darstellen
 	FontSize     float64 `yaml:"font_size"`     // Schriftgröße für TOC-Einträge (0 = Standard)
 	Indent       float64 `yaml:"indent"`        // Einrückung pro Level in mm (Standard: 8)
+	OnlyNumbered bool    `yaml:"only_numbered"` // Nur nummerierte Überschriften im TOC anzeigen
 }
 
 // Save speichert die Konfiguration in eine YAML-Datei.

@@ -3,7 +3,9 @@ package markdown
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
+	"unicode"
 
 	"godocgen/internal/blocks"
 
@@ -14,15 +16,86 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+// excludeFromTOCMarker ist ein spezieller Marker, der anzeigt, dass eine Überschrift
+// nicht im Inhaltsverzeichnis erscheinen und nicht nummeriert werden soll.
+const excludeFromTOCMarker = "\x00EXCLUDE_TOC\x00"
+
+// preprocessExcludedHeadings wandelt die !#! Syntax in normale Headings um und fügt einen Marker hinzu.
+// Beispiel: "!#! Überschrift" -> "# \x00EXCLUDE_TOC\x00Überschrift"
+// Beispiel: "!###!Blackboxtesting" -> "### \x00EXCLUDE_TOC\x00Blackboxtesting"
+// Unterstützt !#!, !##!, !###!, etc. mit oder ohne Leerzeichen nach dem letzten !
+func preprocessExcludedHeadings(content []byte) []byte {
+	lines := strings.Split(string(content), "\n")
+	var result []string
+
+	// Regex für !#! bis !######! Syntax (Leerzeichen nach ! ist optional)
+	excludeHeadingRegex := regexp.MustCompile(`^(!)(#{1,6})(!) ?(.*)$`)
+
+	for _, line := range lines {
+		if matches := excludeHeadingRegex.FindStringSubmatch(line); matches != nil {
+			// matches[2] = die # Zeichen, matches[4] = der Text
+			hashes := matches[2]
+			text := matches[4]
+			// Umwandeln in normales Heading mit Marker
+			result = append(result, hashes+" "+excludeFromTOCMarker+text)
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return []byte(strings.Join(result, "\n"))
+}
+
+// generateAnchorID erstellt eine URL-freundliche ID aus einem Überschriftentext.
+// Beispiel: "Einführung in DocGen" -> "einführung-in-docgen"
+func generateAnchorID(text string) string {
+	// Zu Kleinbuchstaben konvertieren
+	text = strings.ToLower(text)
+
+	// Umlaute und Sonderzeichen normalisieren
+	replacer := strings.NewReplacer(
+		"ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss",
+		"Ä", "ae", "Ö", "oe", "Ü", "ue",
+	)
+	text = replacer.Replace(text)
+
+	// Nur alphanumerische Zeichen und Bindestriche behalten
+	var result strings.Builder
+	lastWasHyphen := false
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(r)
+			lastWasHyphen = false
+		} else if r == ' ' || r == '-' || r == '_' {
+			if !lastWasHyphen {
+				result.WriteRune('-')
+				lastWasHyphen = true
+			}
+		}
+	}
+
+	// Führende und nachfolgende Bindestriche entfernen
+	id := strings.Trim(result.String(), "-")
+
+	// Mehrfache Bindestriche durch einzelne ersetzen
+	re := regexp.MustCompile(`-+`)
+	id = re.ReplaceAllString(id, "-")
+
+	return id
+}
+
 // Parse analysiert den Markdown-Inhalt und wandelt ihn in eine Liste von DocBlocks um.
 func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
+	// Vorverarbeitung: !#! Syntax in normale Headings mit Marker umwandeln
+	processedContent := preprocessExcludedHeadings(content)
+
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.Table,
 			extension.Strikethrough,
 		),
 	)
-	reader := text.NewReader(content)
+	reader := text.NewReader(processedContent)
 	doc := md.Parser().Parse(reader)
 
 	var docBlocks []blocks.DocBlock
@@ -34,28 +107,40 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 
 		switch node := n.(type) {
 		case *ast.Heading:
+			headingText := string(node.Text(processedContent))
+			excludeFromTOC := false
+
+			// Prüfen ob der Marker vorhanden ist
+			if strings.Contains(headingText, excludeFromTOCMarker) {
+				excludeFromTOC = true
+				// Marker aus dem Text entfernen
+				headingText = strings.ReplaceAll(headingText, excludeFromTOCMarker, "")
+			}
+
 			docBlocks = append(docBlocks, blocks.HeadingBlock{
 				Level:           node.Level,
-				Text:            string(node.Text(content)),
+				Text:            headingText,
 				ParentNumbering: parentNumbering,
+				AnchorID:        generateAnchorID(headingText),
+				ExcludeFromTOC:  excludeFromTOC,
 			})
 			return ast.WalkSkipChildren, nil
 		case *ast.Paragraph:
 			docBlocks = append(docBlocks, blocks.ParagraphBlock{
-				Content: parseTextSegments(node, content),
+				Content: parseTextSegments(node, processedContent),
 			})
 			return ast.WalkSkipChildren, nil
 		case *ast.FencedCodeBlock:
-			lang := string(node.Language(content))
+			lang := string(node.Language(processedContent))
 			codeContent := ""
 			for i := 0; i < node.Lines().Len(); i++ {
 				line := node.Lines().At(i)
-				codeContent += string(line.Value(content))
+				codeContent += string(line.Value(processedContent))
 			}
 			if lang == "mermaid" {
 				title := ""
 				if node.Info != nil {
-					info := string(node.Info.Text(content))
+					info := string(node.Info.Text(processedContent))
 					start := strings.Index(info, "{")
 					end := strings.Index(info, "}")
 					if start != -1 && end != -1 && end > start {
@@ -74,13 +159,13 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 			}
 			return ast.WalkSkipChildren, nil
 		case *ast.List:
-			listBlock := parseList(node, content)
+			listBlock := parseList(node, processedContent)
 			docBlocks = append(docBlocks, listBlock)
 			return ast.WalkSkipChildren, nil
 		case *ast.Image:
 			docBlocks = append(docBlocks, blocks.ImageBlock{
 				Path: string(node.Destination),
-				Alt:  string(node.Text(content)),
+				Alt:  string(node.Text(processedContent)),
 			})
 			return ast.WalkSkipChildren, nil
 		case *ast.ThematicBreak:
@@ -94,7 +179,7 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 					for cell := r.FirstChild(); cell != nil; cell = cell.NextSibling() {
 						if c, ok := cell.(*extAst.TableCell); ok {
 							rowData = append(rowData, blocks.TableRow{
-								Content: parseTextSegments(c, content),
+								Content: parseTextSegments(c, processedContent),
 								Header:  c.Alignment == extAst.AlignNone,
 							})
 						}
@@ -111,10 +196,10 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 				switch c := child.(type) {
 				case *ast.Paragraph:
 					quoteContent = append(quoteContent, blocks.ParagraphBlock{
-						Content: parseTextSegments(c, content),
+						Content: parseTextSegments(c, processedContent),
 					})
 				case *ast.List:
-					listBlock := parseList(c, content)
+					listBlock := parseList(c, processedContent)
 					quoteContent = append(quoteContent, listBlock)
 				}
 			}
