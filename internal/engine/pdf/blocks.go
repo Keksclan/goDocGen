@@ -2,8 +2,9 @@
 package pdf
 
 import (
-	"godocgen/internal/blocks"
 	"fmt"
+	"godocgen/internal/blocks"
+	"godocgen/internal/util"
 	"strings"
 	"unicode"
 )
@@ -59,8 +60,52 @@ func cleanCodeText(text string) string {
 	return result.String()
 }
 
+func (g *Generator) fixSegmentSpacing(content []blocks.TextSegment) {
+	for i := 0; i < len(content); i++ {
+		seg := &content[i]
+		// Punctuation Spacing Korrektur (nur für normalen Text, nicht für Inline-Code)
+		if !seg.Code && seg.Link == "" {
+			seg.Text = util.FixPunctuationSpacing(seg.Text)
+
+			// Segmentgrenzen-Korrektur: Wenn dieses Segment mit einem Satzzeichen endet
+			// und das nächste Segment mit einem Buchstaben/Ziffer beginnt.
+			if i < len(content)-1 {
+				nextSeg := &content[i+1]
+				if len(seg.Text) > 0 && len(nextSeg.Text) > 0 {
+					lastChar := seg.Text[len(seg.Text)-1]
+					nextChar := nextSeg.Text[0]
+
+					// Wenn letztes Zeichen ein Satzzeichen [,?!:;.] ist und nächstes Zeichen kein Leerzeichen
+					if strings.ContainsAny(string(lastChar), ",?!:;.") &&
+						nextChar != ' ' && nextChar != '\n' && nextChar != '\r' && nextChar != '\t' {
+
+						// Ausnahmen wie bei FixPunctuationSpacing (vereinfacht für Grenzen)
+						isException := false
+						if lastChar == '.' && nextChar >= '0' && nextChar <= '9' {
+							isException = true
+						}
+						if lastChar == ':' && (nextChar == '/' || nextChar == '\\') {
+							isException = true
+						}
+
+						if !isException {
+							seg.Text += " "
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 // renderBlock entscheidet anhand des Typs des Blocks, welche Rendering-Funktion aufgerufen wird.
 func (g *Generator) renderBlock(block blocks.DocBlock, isMeasurement bool) {
+	// Wir klonen den Block nicht, um Speicher zu sparen, aber wir müssen vorsichtig sein,
+	// da wir h.Text in renderHeading temporär verändern (durch fixPunctuationSpacing).
+	// Da renderAll zweimal aufgerufen wird (einmal für Messung, einmal für PDF),
+	// könnte fixPunctuationSpacing doppelt angewendet werden.
+	// Das ist bei unserer Regex-Logik aber unproblematisch (idempotent).
+
 	switch b := block.(type) {
 	case blocks.HeadingBlock:
 		g.renderHeading(b, isMeasurement)
@@ -123,7 +168,7 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 
 	numbering := ""
-	text := h.Text
+	text := util.FixPunctuationSpacing(h.Text)
 
 	// Keine Nummerierung für ausgeschlossene Überschriften
 	if !h.ExcludeFromTOC {
@@ -348,6 +393,7 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 
 	lineHeight := g.getLineHeight()
 
+	g.fixSegmentSpacing(p.Content)
 	for _, seg := range p.Content {
 		style := ""
 		if seg.Bold {
@@ -765,6 +811,8 @@ func (g *Generator) renderListWithIndent(l blocks.ListBlock, indentLevel int) {
 	currentIndent := baseIndent + float64(indentLevel)*indentStep
 
 	for i, item := range l.Items {
+		g.fixSegmentSpacing(item.Content)
+
 		prefix := "• "
 		if l.Ordered {
 			prefix = fmt.Sprintf("%d. ", i+1)
@@ -868,6 +916,7 @@ func (g *Generator) renderBlockquote(b blocks.BlockquoteBlock) {
 			g.setPrimaryTextColor()
 			lineHeight := g.getLineHeight()
 
+			g.fixSegmentSpacing(content.Content)
 			for _, seg := range content.Content {
 				style := "I" // Basis-Style ist kursiv
 				if seg.Bold {
@@ -898,13 +947,14 @@ func (g *Generator) renderBlockquote(b blocks.BlockquoteBlock) {
 
 // renderTable rendert eine Tabelle mit Kopfzeile und automatischer Spaltenbreite.
 // Verbesserte Darstellung mit schöneren Rahmen, Padding und Zebra-Streifen.
+// Tabellen werden nie auf zwei Seiten aufgeteilt - sie werden komplett auf einer Seite gerendert.
 func (g *Generator) renderTable(t blocks.TableBlock) {
 	if len(t.Rows) == 0 {
 		return
 	}
 
 	left, _, right, _ := g.pdf.GetMargins()
-	w, _ := g.pdf.GetPageSize()
+	w, pageHeight := g.pdf.GetPageSize()
 	width := w - left - right
 	colCount := len(t.Rows[0])
 	if colCount == 0 {
@@ -922,11 +972,13 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	g.safeSetFont("main", "B", g.cfg.FontSize)
 	g.setPrimaryTextColor()
 
-	rowIndex := 0
-	for _, row := range t.Rows {
-		// Berechne maximale Zeilenhöhe
+	// Berechne die Gesamthöhe der Tabelle vorab
+	totalTableHeight := 0.0
+	rowHeights := make([]float64, len(t.Rows))
+	for rowIdx, row := range t.Rows {
 		maxH := 0.0
 		for _, cell := range row {
+			g.fixSegmentSpacing(cell.Content)
 			cellText := ""
 			for _, seg := range cell.Content {
 				cellText += seg.Text
@@ -938,8 +990,27 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 			}
 		}
 		maxH += 2 * cellPadding // Padding oben und unten
+		rowHeights[rowIdx] = maxH
+		totalTableHeight += maxH
+	}
+	totalTableHeight += 5 // Abstand nach der Tabelle
 
-		g.checkPageBreak(maxH)
+	// Berechne verfügbare Höhe auf der aktuellen Seite
+	_, top, _, bottom := g.pdf.GetMargins()
+	availableHeight := pageHeight - g.pdf.GetY() - bottom - 10 // 10 für Sicherheitspuffer
+
+	// Prüfe ob die gesamte Tabelle auf die aktuelle Seite passt
+	// Wenn nicht und die Tabelle auf eine neue Seite passen würde, füge Seitenumbruch ein
+	maxPageHeight := pageHeight - top - bottom - 20 // Maximale Höhe auf einer leeren Seite
+	if totalTableHeight > availableHeight && totalTableHeight <= maxPageHeight {
+		// Tabelle passt nicht auf aktuelle Seite, aber auf eine neue Seite
+		g.pdf.AddPage()
+	}
+	// Wenn die Tabelle größer als eine Seite ist, wird sie trotzdem gerendert (Fallback)
+
+	rowIndex := 0
+	for rowIdx, row := range t.Rows {
+		maxH := rowHeights[rowIdx]
 
 		isHeader := len(row) > 0 && row[0].Header
 

@@ -12,77 +12,99 @@ import (
 )
 
 func init() {
-	// IHK Theme: Weißer Hintergrund mit blauer Syntax-Hervorhebung
-	// Professionelles, sauberes Design passend für IHK-Dokumentationen
+	// IHK Theme: Weißer Hintergrund mit professioneller Syntax-Hervorhebung
+	// Ausgewogene Farbpalette für gute Lesbarkeit und Unterscheidbarkeit
+	// Optimiert für Go-Code
 	ihkStyle := styles.Register(chroma.MustNewStyle("ihk", chroma.StyleEntries{
-		chroma.Background:         "bg:#ffffff",
-		chroma.Text:               "#1a1a1a",
-		chroma.Keyword:            "#0066cc bold",
-		chroma.KeywordConstant:    "#0066cc bold",
-		chroma.KeywordDeclaration: "#0066cc bold",
-		chroma.KeywordNamespace:   "#0066cc bold",
-		chroma.KeywordPseudo:      "#0066cc",
-		chroma.KeywordReserved:    "#0066cc bold",
-		chroma.KeywordType:        "#0077aa bold",
-		chroma.Name:               "#1a1a1a",
-		chroma.NameBuiltin:        "#0077aa",
-		chroma.NameBuiltinPseudo:  "#0077aa",
-		chroma.NameClass:          "#0055aa bold",
-		chroma.NameConstant:       "#003366",
-		chroma.NameDecorator:      "#0066cc",
-		chroma.NameEntity:         "#0066cc",
-		chroma.NameException:      "#cc0000",
-		chroma.NameFunction:       "#0055aa",
-		chroma.NameLabel:          "#003366",
-		chroma.NameNamespace:      "#0055aa",
-		chroma.NameTag:            "#0066cc bold",
-		chroma.NameVariable:       "#003366",
-		chroma.NameVariableClass:  "#003366",
-		chroma.NameVariableGlobal: "#003366",
-		chroma.Literal:            "#0066cc",
-		chroma.LiteralDate:        "#0066cc",
-		chroma.String:             "#008844",
-		chroma.StringAffix:        "#008844",
-		chroma.StringBacktick:     "#008844",
-		chroma.StringChar:         "#008844",
-		chroma.StringDelimiter:    "#008844",
-		chroma.StringDoc:          "#666666 italic",
-		chroma.StringDouble:       "#008844",
-		chroma.StringEscape:       "#0066cc",
-		chroma.StringHeredoc:      "#008844",
-		chroma.StringInterpol:     "#0066cc",
-		chroma.StringOther:        "#008844",
-		chroma.StringRegex:        "#0066cc",
-		chroma.StringSingle:       "#008844",
-		chroma.StringSymbol:       "#008844",
-		chroma.Number:             "#cc6600",
-		chroma.NumberBin:          "#cc6600",
-		chroma.NumberFloat:        "#cc6600",
-		chroma.NumberHex:          "#cc6600",
-		chroma.NumberInteger:      "#cc6600",
-		chroma.NumberIntegerLong:  "#cc6600",
-		chroma.NumberOct:          "#cc6600",
-		chroma.Operator:           "#0066cc",
-		chroma.OperatorWord:       "#0066cc bold",
-		chroma.Punctuation:        "#1a1a1a",
-		chroma.Comment:            "#888888 italic",
-		chroma.CommentHashbang:    "#888888 italic",
-		chroma.CommentMultiline:   "#888888 italic",
-		chroma.CommentPreproc:     "#0066cc",
-		chroma.CommentPreprocFile: "#008844",
-		chroma.CommentSingle:      "#888888 italic",
-		chroma.CommentSpecial:     "#0066cc italic",
-		chroma.Generic:            "#1a1a1a",
-		chroma.GenericDeleted:     "#cc0000",
-		chroma.GenericEmph:        "italic",
-		chroma.GenericError:       "#cc0000",
-		chroma.GenericHeading:     "#0055aa bold",
-		chroma.GenericInserted:    "#008844",
-		chroma.GenericOutput:      "#666666",
-		chroma.GenericPrompt:      "#0055aa bold",
-		chroma.GenericStrong:      "bold",
-		chroma.GenericSubheading:  "#0055aa",
-		chroma.GenericTraceback:   "#cc0000",
+		// Hintergrund und Basis-Text
+		chroma.Background: "bg:#ffffff",
+		chroma.Text:       "#24292e", // Dunkles Grau für normalen Text
+
+		// Keywords - Blau für Go-Keywords (func, package, import, var, const, type, etc.)
+		chroma.Keyword:            "#0000ff bold", // Klassisches Blau für Keywords
+		chroma.KeywordConstant:    "#0000ff bold", // true, false, nil, iota
+		chroma.KeywordDeclaration: "#0000ff bold", // func, type, var, const, struct, interface
+		chroma.KeywordNamespace:   "#0000ff bold", // package, import
+		chroma.KeywordPseudo:      "#0000ff",      // Pseudo-Keywords
+		chroma.KeywordReserved:    "#0000ff bold", // Reservierte Wörter
+		chroma.KeywordType:        "#267f99 bold", // Go-Typen: int, string, bool - Türkis/Teal
+
+		// Namen - Verschiedene Farben für gute Unterscheidung
+		chroma.Name:                 "#24292e",      // Normale Bezeichner - dunkelgrau
+		chroma.NameBuiltin:          "#795e26",      // Go-Builtins: make, len, cap - Braun/Gold
+		chroma.NameBuiltinPseudo:    "#795e26",      // Pseudo-Builtins
+		chroma.NameClass:            "#267f99 bold", // Struct/Interface-Namen - Türkis
+		chroma.NameConstant:         "#0070c1",      // Konstanten - Hellblau
+		chroma.NameDecorator:        "#795e26",      // Decorators
+		chroma.NameEntity:           "#24292e",      // Entities
+		chroma.NameException:        "#d73a49",      // Errors/Exceptions - Rot
+		chroma.NameFunction:         "#795e26",      // Funktionsnamen - Braun/Gold
+		chroma.NameLabel:            "#6f42c1",      // Labels - Lila
+		chroma.NameNamespace:        "#24292e",      // Package-Namen - dunkelgrau
+		chroma.NameOther:            "#24292e",      // Andere Namen
+		chroma.NameTag:              "#22863a",      // Tags - Grün
+		chroma.NameVariable:         "#24292e",      // Variablen - dunkelgrau
+		chroma.NameVariableClass:    "#24292e",      // Klassen-Variablen
+		chroma.NameVariableGlobal:   "#24292e",      // Globale Variablen
+		chroma.NameVariableInstance: "#24292e",      // Instanz-Variablen
+
+		// Literale
+		chroma.Literal:     "#098658", // Grün für Literale
+		chroma.LiteralDate: "#098658",
+
+		// Strings - Dunkelrot/Braun für gute Lesbarkeit
+		chroma.String:          "#a31515", // Strings in Dunkelrot
+		chroma.StringAffix:     "#a31515",
+		chroma.StringBacktick:  "#a31515", // Raw strings in Go
+		chroma.StringChar:      "#a31515", // Rune literals
+		chroma.StringDelimiter: "#a31515",
+		chroma.StringDoc:       "#6a737d italic", // Doc-Strings - Grau
+		chroma.StringDouble:    "#a31515",
+		chroma.StringEscape:    "#0000ff bold", // Escape-Sequenzen - Blau
+		chroma.StringHeredoc:   "#a31515",
+		chroma.StringInterpol:  "#a31515",
+		chroma.StringOther:     "#a31515",
+		chroma.StringRegex:     "#811f3f", // Regex - Dunkelrot
+		chroma.StringSingle:    "#a31515",
+		chroma.StringSymbol:    "#a31515",
+
+		// Zahlen - Grün für guten Kontrast
+		chroma.Number:            "#098658", // Zahlen in Grün
+		chroma.NumberBin:         "#098658",
+		chroma.NumberFloat:       "#098658",
+		chroma.NumberHex:         "#098658",
+		chroma.NumberInteger:     "#098658",
+		chroma.NumberIntegerLong: "#098658",
+		chroma.NumberOct:         "#098658",
+
+		// Operatoren - Dunkelgrau
+		chroma.Operator:     "#24292e", // Operatoren: +, -, *, /, :=, ==, etc.
+		chroma.OperatorWord: "#0000ff", // Wort-Operatoren - Blau
+
+		// Interpunktion - Dunkelgrau für Struktur
+		chroma.Punctuation: "#24292e", // Klammern, Kommas, etc.
+
+		// Kommentare - Grün und kursiv (wie in vielen IDEs)
+		chroma.Comment:            "#008000 italic", // Einzeilige Kommentare - Grün
+		chroma.CommentHashbang:    "#008000 italic",
+		chroma.CommentMultiline:   "#008000 italic", // Mehrzeilige Kommentare
+		chroma.CommentPreproc:     "#0000ff",        // Präprozessor - Blau
+		chroma.CommentPreprocFile: "#a31515",        // Präprozessor-Datei - Dunkelrot
+		chroma.CommentSingle:      "#008000 italic",
+		chroma.CommentSpecial:     "#008000 bold italic", // Spezielle Kommentare (TODO, FIXME)
+
+		// Generische Styles
+		chroma.Generic:           "#24292e",
+		chroma.GenericDeleted:    "#d73a49 bg:#ffeef0", // Gelöschte Zeilen - Rot
+		chroma.GenericEmph:       "italic",
+		chroma.GenericError:      "#d73a49 bold",       // Fehler - Rot
+		chroma.GenericHeading:    "#0000ff bold",       // Überschriften - Blau
+		chroma.GenericInserted:   "#22863a bg:#e6ffed", // Eingefügte Zeilen - Grün
+		chroma.GenericOutput:     "#6a737d",            // Output - Grau
+		chroma.GenericPrompt:     "#0000ff bold",       // Prompt - Blau
+		chroma.GenericStrong:     "bold",
+		chroma.GenericSubheading: "#0000ff", // Unterüberschriften - Blau
+		chroma.GenericTraceback:  "#d73a49", // Traceback - Rot
 	}))
 	_ = ihkStyle // Verhindert "unused variable" Warnung
 }

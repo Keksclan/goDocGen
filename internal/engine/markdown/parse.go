@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"godocgen/internal/blocks"
+	"godocgen/internal/util"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -108,6 +109,7 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 		switch node := n.(type) {
 		case *ast.Heading:
 			headingText := string(node.Text(processedContent))
+			headingText = util.FixPunctuationSpacing(headingText)
 			excludeFromTOC := false
 
 			// Prüfen ob der Marker vorhanden ist
@@ -174,13 +176,26 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 		case *extAst.Table:
 			table := blocks.TableBlock{}
 			for row := node.FirstChild(); row != nil; row = row.NextSibling() {
-				if r, ok := row.(*extAst.TableRow); ok {
+				// Prüfen ob es eine Header-Zeile ist
+				if header, ok := row.(*extAst.TableHeader); ok {
+					var rowData []blocks.TableRow
+					for cell := header.FirstChild(); cell != nil; cell = cell.NextSibling() {
+						if c, ok := cell.(*extAst.TableCell); ok {
+							rowData = append(rowData, blocks.TableRow{
+								Content: parseTextSegments(c, processedContent),
+								Header:  true, // Header-Zellen sind immer Header
+							})
+						}
+					}
+					table.Rows = append(table.Rows, rowData)
+				} else if r, ok := row.(*extAst.TableRow); ok {
+					// Normale Datenzeile
 					var rowData []blocks.TableRow
 					for cell := r.FirstChild(); cell != nil; cell = cell.NextSibling() {
 						if c, ok := cell.(*extAst.TableCell); ok {
 							rowData = append(rowData, blocks.TableRow{
 								Content: parseTextSegments(c, processedContent),
-								Header:  c.Alignment == extAst.AlignNone,
+								Header:  false, // Datenzeilen sind keine Header
 							})
 						}
 					}
@@ -231,8 +246,14 @@ func parseTextSegments(n ast.Node, source []byte) []blocks.TextSegment {
 		if node.Kind() == ast.KindText {
 			if entering {
 				txt := node.(*ast.Text)
+				content := string(txt.Text(source))
+				// Softbreaks und Hardbreaks durch Leerzeichen ersetzen
+				if txt.SoftLineBreak() || txt.HardLineBreak() {
+					content += " "
+				}
+				content = util.FixPunctuationSpacing(content)
 				segments = append(segments, blocks.TextSegment{
-					Text:          string(txt.Text(source)),
+					Text:          content,
 					Bold:          isBold,
 					Italic:        isItalic,
 					Strikethrough: isStrikethrough,
