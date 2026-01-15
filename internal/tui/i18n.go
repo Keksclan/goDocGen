@@ -44,7 +44,6 @@ type translation struct {
 	tocNumbers      string
 	tocDots         string
 	tocLineSpacing  string
-	tocBoldHeadings string
 	tocFontSize     string
 	tocIndent       string
 	headerNumbering string
@@ -112,7 +111,6 @@ var translations = map[string]translation{
 		tocNumbers:      "Nummern anzeigen",
 		tocDots:         "Punkte anzeigen",
 		tocLineSpacing:  "Zeilenabstand",
-		tocBoldHeadings: "Fett darstellen",
 		tocFontSize:     "Schriftgröße",
 		tocIndent:       "Einrückung (mm)",
 		headerNumbering: "Header Nummerierung",
@@ -178,7 +176,6 @@ var translations = map[string]translation{
 		tocNumbers:      "Show Numbers",
 		tocDots:         "Show Dots",
 		tocLineSpacing:  "Line Spacing",
-		tocBoldHeadings: "Bold Headings",
 		tocFontSize:     "Font Size",
 		tocIndent:       "Indent (mm)",
 		headerNumbering: "Header Numbering",

@@ -36,9 +36,6 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 				continue
 			}
 			h := baseLineHeight
-			if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
-				h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
-			}
 			g.checkPageBreak(h)
 			g.pdf.Ln(h)
 		}
@@ -77,20 +74,13 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 		h := baseLineHeight
 		style := ""
 
-		// Bold für Level 1 wenn konfiguriert
-		if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
-			style = "B"
-			g.safeSetFont("main", style, fontSize)
-			h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
-		} else {
-			// Kleinere Schrift für Unterebenen
-			subFontSize := fontSize - float64(entry.Level-1)*0.5
-			if subFontSize < fontSize-2 {
-				subFontSize = fontSize - 2
-			}
-			g.safeSetFont("main", "", subFontSize)
-			fontSize = subFontSize
+		// Kleinere Schrift für Unterebenen
+		subFontSize := fontSize - float64(entry.Level-1)*0.5
+		if subFontSize < fontSize-2 {
+			subFontSize = fontSize - 2
 		}
+		g.safeSetFont("main", "", subFontSize)
+		fontSize = subFontSize
 
 		text := ""
 		if g.cfg.TOC.ShowNumbers {
@@ -120,7 +110,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 
 		// Seitenzahl
 		g.setPrimaryTextColor()
-		g.safeSetFont("main", "B", fontSize)
+		g.safeSetFont("main", "", fontSize)
 		g.pdf.SetX(w - right - 8)
 		displayPage := entry.Page - g.cfg.PageNumbers.StartPage + 1
 		if displayPage < 1 {
@@ -137,7 +127,7 @@ func (g *Generator) renderTOC(isMeasurement bool) int {
 // measureTOC berechnet die Anzahl der Seiten, die das Inhaltsverzeichnis einnehmen wird,
 // ohne das eigentliche PDF-Dokument zu verändern.
 func (g *Generator) measureTOC() int {
-	if !g.cfg.TOC.Enabled || len(g.toc) == 0 {
+	if !g.cfg.TOC.Enabled {
 		return 0
 	}
 
@@ -154,23 +144,22 @@ func (g *Generator) measureTOC() int {
 	currentY += 8.0  // Linie und Abstand (kompakter)
 
 	pages := 1
-	for _, entry := range g.toc {
-		// Wenn OnlyNumbered aktiv ist, nur nummerierte Einträge zählen
-		if g.cfg.TOC.OnlyNumbered && entry.Number == "" {
-			continue
-		}
-		h := baseLineHeight
-		if entry.Level == 1 && g.cfg.TOC.BoldHeadings {
-			h = baseLineHeight + 2 // Etwas mehr Platz für Hauptüberschriften
-		}
+	if len(g.toc) > 0 {
+		for _, entry := range g.toc {
+			// Wenn OnlyNumbered aktiv ist, nur nummerierte Einträge zählen
+			if g.cfg.TOC.OnlyNumbered && entry.Number == "" {
+				continue
+			}
+			h := baseLineHeight
 
-		// checkPageBreak Logik simulieren
-		if currentY+h > usableHeight+top-10 { // -10 als Sicherheitspuffer
-			pages++
-			currentY = top + 20.0 // Neue Seite
+			// checkPageBreak Logik simulieren
+			if currentY+h > usableHeight+top-10 { // -10 als Sicherheitspuffer
+				pages++
+				currentY = top + 20.0 // Neue Seite
+			}
+			currentY += h
 		}
-		currentY += h
 	}
 
-	return pages
+	return pages + 1
 }

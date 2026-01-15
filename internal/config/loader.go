@@ -305,7 +305,6 @@ func setDefaults(cfg *Config) {
 	if cfg.TOC.Indent == 0 {
 		cfg.TOC.Indent = 6.0 // Kleinere Einrückung für kompakteres TOC
 	}
-	// BoldHeadings: Standardwert ist false (wird aus YAML gelesen)
 
 	// Mermaid Defaults
 	if cfg.Mermaid.Scale == 0 {

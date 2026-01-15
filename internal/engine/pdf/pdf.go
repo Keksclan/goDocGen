@@ -218,7 +218,6 @@ func (g *Generator) Generate(outputPath string) error {
 	// Durchgang 1: Messen und Sammeln des Inhaltsverzeichnisses
 	g.headingCounts = make([]int, 6)
 	g.renderAll(true)
-	g.totalPages = g.pdf.PageNo()
 
 	// Zurücksetzen für Durchgang 2
 	g.pdf = gofpdf.New("P", "mm", "A4", "")
@@ -260,21 +259,28 @@ func (g *Generator) renderAll(isMeasurement bool) {
 	}
 
 	// Inline-Footer am Ende des Contents
-	if !isMeasurement && g.cfg.Layout.FooterStyle == "inline" {
+	if g.cfg.Layout.FooterStyle == "inline" {
 		g.pdf.Ln(10)
-		g.renderFooterAt(g.pdf.GetY())
+		if !isMeasurement {
+			g.renderFooterAt(g.pdf.GetY())
+		}
 	}
 
 	// Wenn wir im Mess-Durchgang sind, korrigieren wir nun die Seitenzahlen im TOC,
 	// falls das TOC mehr als eine Seite (den initialen Platzhalter) beansprucht.
-	if isMeasurement && g.cfg.TOC.Enabled && tocPages > 0 {
-		// Im ersten Durchgang von renderTOC wurde g.toc erst gefüllt, nachdem renderTOC gerufen wurde.
-		// Daher müssen wir das TOC jetzt, wo g.toc voll ist, nochmals virtuell messen.
-		actualTOCPages := g.measureTOC()
-		offset := actualTOCPages - tocPages
-		if offset != 0 {
-			for i := range g.toc {
-				g.toc[i].Page += offset
+	if isMeasurement {
+		g.totalPages = g.pdf.PageNo()
+
+		if g.cfg.TOC.Enabled && tocPages > 0 {
+			// Im ersten Durchgang von renderTOC wurde g.toc erst gefüllt, nachdem renderTOC gerufen wurde.
+			// Daher müssen wir das TOC jetzt, wo g.toc voll ist, nochmals virtuell messen.
+			actualTOCPages := g.measureTOC()
+			offset := actualTOCPages - tocPages
+			if offset != 0 {
+				for i := range g.toc {
+					g.toc[i].Page += offset
+				}
+				g.totalPages += offset
 			}
 		}
 	}

@@ -113,6 +113,10 @@ func (g *Generator) replacePlaceholders(text string) string {
 		totalDisplayPages = 1
 	}
 
+	if strings.Contains(text, "{page}") && strings.Contains(text, "{total}") {
+		// fmt.Printf("Rendering Page %d of %d\n", displayPage, totalDisplayPages)
+	}
+
 	text = strings.ReplaceAll(text, "{page}", fmt.Sprintf("%d", displayPage))
 	text = strings.ReplaceAll(text, "{total}", fmt.Sprintf("%d", totalDisplayPages))
 	text = strings.ReplaceAll(text, "{title}", g.cfg.Title)

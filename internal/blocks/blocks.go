@@ -93,8 +93,17 @@ func (b BlockquoteBlock) IsBlock() {}
 
 // TableBlock repräsentiert eine Tabelle.
 type TableBlock struct {
-	Rows [][]TableRow // Zweidimensionale Liste der Tabellenzellen
+	Rows       [][]TableRow // Zweidimensionale Liste der Tabellenzellen
+	Alignments []Align      // Ausrichtung der Spalten
 }
+
+type Align int
+
+const (
+	AlignLeft Align = iota
+	AlignCenter
+	AlignRight
+)
 
 // TableRow repräsentiert eine Zelle in einer Tabellenzeile.
 type TableRow struct {

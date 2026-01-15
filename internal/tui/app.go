@@ -411,82 +411,77 @@ func (m *model) setupInputs() {
 	m.inputs[38] = t
 
 	t = textinput.New()
-	t.Placeholder = m.T(func(t translation) string { return t.tocBoldHeadings }) + " (true/false)"
-	t.SetValue(fmt.Sprintf("%t", m.cfg.TOC.BoldHeadings))
-	m.inputs[39] = t
-
-	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.tocFontSize })
 	t.SetValue(fmt.Sprintf("%.1f", m.cfg.TOC.FontSize))
-	m.inputs[40] = t
+	m.inputs[39] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.tocIndent })
 	t.SetValue(fmt.Sprintf("%.1f", m.cfg.TOC.Indent))
-	m.inputs[41] = t
+	m.inputs[40] = t
 
-	// 42-46: Code-Einstellungen
+	// 41-45: Code-Einstellungen
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.codeFontSize })
 	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Code.FontSize))
-	m.inputs[42] = t
+	m.inputs[41] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.codeMinFontSize })
 	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Code.MinFontSize))
-	m.inputs[43] = t
+	m.inputs[42] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.codeAutoScale }) + " (true/false)"
 	t.SetValue(fmt.Sprintf("%t", m.cfg.Code.AutoScale))
-	m.inputs[44] = t
+	m.inputs[43] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.codeMaxLines })
 	t.SetValue(fmt.Sprintf("%d", m.cfg.Code.MaxLines))
-	m.inputs[45] = t
+	m.inputs[44] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.codeMaxLineLen })
 	t.SetValue(fmt.Sprintf("%d", m.cfg.Code.MaxLineLen))
-	m.inputs[46] = t
+	m.inputs[45] = t
 
-	// 47-51: Farb-Einstellungen
+	// 46-50: Farb-Einstellungen
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.colorTitle })
 	t.SetValue(m.cfg.Colors.Title)
-	m.inputs[47] = t
+	m.inputs[46] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.colorHeader })
 	t.SetValue(m.cfg.Colors.Header)
-	m.inputs[48] = t
+	m.inputs[47] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.colorBackground })
 	t.SetValue(m.cfg.Colors.Background)
-	m.inputs[49] = t
+	m.inputs[48] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.colorText })
 	t.SetValue(m.cfg.Colors.Text)
-	m.inputs[50] = t
+	m.inputs[49] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.colorAccent })
 	t.SetValue(m.cfg.Colors.Accent)
-	m.inputs[51] = t
+	m.inputs[50] = t
 
-	// 52-53: Erweiterte Mermaid-Einstellungen
+	// 51-52: Erweiterte Mermaid-Einstellungen
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.mermaidWidth })
 	t.SetValue(fmt.Sprintf("%.1f", m.cfg.Mermaid.Width))
-	m.inputs[52] = t
+	m.inputs[51] = t
 
 	t = textinput.New()
 	t.Placeholder = m.T(func(t translation) string { return t.mermaidScale })
 	t.SetValue(fmt.Sprintf("%.2f", m.cfg.Mermaid.Scale))
-	m.inputs[53] = t
+	m.inputs[52] = t
 }
 
 func (m *model) applyIHKStandards() {
@@ -603,49 +598,46 @@ func (m *model) saveConfig() {
 
 	m.cfg.Layout.FooterStyle = m.inputs[37].Value()
 
-	// Erweiterte TOC-Einstellungen (38-41)
+	// Erweiterte TOC-Einstellungen (38-40)
 	if v, err := strconv.ParseFloat(m.inputs[38].Value(), 64); err == nil {
 		m.cfg.TOC.LineSpacing = v
 	}
-	if v, err := strconv.ParseBool(m.inputs[39].Value()); err == nil {
-		m.cfg.TOC.BoldHeadings = v
-	}
-	if v, err := strconv.ParseFloat(m.inputs[40].Value(), 64); err == nil {
+	if v, err := strconv.ParseFloat(m.inputs[39].Value(), 64); err == nil {
 		m.cfg.TOC.FontSize = v
 	}
-	if v, err := strconv.ParseFloat(m.inputs[41].Value(), 64); err == nil {
+	if v, err := strconv.ParseFloat(m.inputs[40].Value(), 64); err == nil {
 		m.cfg.TOC.Indent = v
 	}
 
-	// Code-Einstellungen (42-46)
-	if v, err := strconv.ParseFloat(m.inputs[42].Value(), 64); err == nil {
+	// Code-Einstellungen (41-45)
+	if v, err := strconv.ParseFloat(m.inputs[41].Value(), 64); err == nil {
 		m.cfg.Code.FontSize = v
 	}
-	if v, err := strconv.ParseFloat(m.inputs[43].Value(), 64); err == nil {
+	if v, err := strconv.ParseFloat(m.inputs[42].Value(), 64); err == nil {
 		m.cfg.Code.MinFontSize = v
 	}
-	if v, err := strconv.ParseBool(m.inputs[44].Value()); err == nil {
+	if v, err := strconv.ParseBool(m.inputs[43].Value()); err == nil {
 		m.cfg.Code.AutoScale = v
 	}
-	if v, err := strconv.Atoi(m.inputs[45].Value()); err == nil {
+	if v, err := strconv.Atoi(m.inputs[44].Value()); err == nil {
 		m.cfg.Code.MaxLines = v
 	}
-	if v, err := strconv.Atoi(m.inputs[46].Value()); err == nil {
+	if v, err := strconv.Atoi(m.inputs[45].Value()); err == nil {
 		m.cfg.Code.MaxLineLen = v
 	}
 
-	// Farb-Einstellungen (47-51)
-	m.cfg.Colors.Title = m.inputs[47].Value()
-	m.cfg.Colors.Header = m.inputs[48].Value()
-	m.cfg.Colors.Background = m.inputs[49].Value()
-	m.cfg.Colors.Text = m.inputs[50].Value()
-	m.cfg.Colors.Accent = m.inputs[51].Value()
+	// Farb-Einstellungen (46-50)
+	m.cfg.Colors.Title = m.inputs[46].Value()
+	m.cfg.Colors.Header = m.inputs[47].Value()
+	m.cfg.Colors.Background = m.inputs[48].Value()
+	m.cfg.Colors.Text = m.inputs[49].Value()
+	m.cfg.Colors.Accent = m.inputs[50].Value()
 
-	// Erweiterte Mermaid-Einstellungen (52-53)
-	if v, err := strconv.ParseFloat(m.inputs[52].Value(), 64); err == nil {
+	// Mermaid-Einstellungen (51-52)
+	if v, err := strconv.ParseFloat(m.inputs[51].Value(), 64); err == nil {
 		m.cfg.Mermaid.Width = v
 	}
-	if v, err := strconv.ParseFloat(m.inputs[53].Value(), 64); err == nil {
+	if v, err := strconv.ParseFloat(m.inputs[52].Value(), 64); err == nil {
 		m.cfg.Mermaid.Scale = v
 	}
 

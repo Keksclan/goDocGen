@@ -34,7 +34,6 @@ type TOC struct {
 	ShowNumbers  bool    `yaml:"show_numbers"`  // Nummern im TOC anzeigen
 	ShowDots     bool    `yaml:"show_dots"`     // Punkte zwischen Text und Seite anzeigen
 	LineSpacing  float64 `yaml:"line_spacing"`  // Zeilenabstand im TOC (z.B. 1.0 für kompakt, 1.5 für mehr Abstand)
-	BoldHeadings bool    `yaml:"bold_headings"` // Überschriften fett darstellen
 	FontSize     float64 `yaml:"font_size"`     // Schriftgröße für TOC-Einträge (0 = Standard)
 	Indent       float64 `yaml:"indent"`        // Einrückung pro Level in mm (Standard: 8)
 	OnlyNumbered bool    `yaml:"only_numbered"` // Nur nummerierte Überschriften im TOC anzeigen

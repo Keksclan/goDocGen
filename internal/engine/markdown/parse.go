@@ -175,6 +175,20 @@ func Parse(content []byte, parentNumbering string) ([]blocks.DocBlock, error) {
 			return ast.WalkSkipChildren, nil
 		case *extAst.Table:
 			table := blocks.TableBlock{}
+			// Alignments extrahieren
+			for _, align := range node.Alignments {
+				switch align {
+				case extAst.AlignLeft:
+					table.Alignments = append(table.Alignments, blocks.AlignLeft)
+				case extAst.AlignCenter:
+					table.Alignments = append(table.Alignments, blocks.AlignCenter)
+				case extAst.AlignRight:
+					table.Alignments = append(table.Alignments, blocks.AlignRight)
+				default:
+					table.Alignments = append(table.Alignments, blocks.AlignLeft)
+				}
+			}
+
 			for row := node.FirstChild(); row != nil; row = row.NextSibling() {
 				// Prüfen ob es eine Header-Zeile ist
 				if header, ok := row.(*extAst.TableHeader); ok {

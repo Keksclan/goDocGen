@@ -280,8 +280,7 @@ func (g *Generator) renderHeading(h blocks.HeadingBlock, isMeasurement bool) {
 	}
 
 	displayText := numbering + text
-	align := g.getAlign(g.cfg.Layout.Body)
-	g.pdf.MultiCell(0, 10, g.prepareText(displayText), "", align, false)
+	g.pdf.MultiCell(0, 10, g.prepareText(displayText), "", "L", false)
 	g.pdf.Ln(3)
 }
 
@@ -392,6 +391,25 @@ func (g *Generator) renderParagraph(p blocks.ParagraphBlock) {
 	g.setPrimaryTextColor()
 
 	lineHeight := g.getLineHeight()
+
+	// Prüfen, ob der Absatz Formatierungen enthält
+	hasFormatting := false
+	fullText := ""
+	for _, seg := range p.Content {
+		if seg.Bold || seg.Italic || seg.Strikethrough || seg.Code || seg.Link != "" {
+			hasFormatting = true
+		}
+		fullText += seg.Text
+	}
+
+	// Wenn keine Formatierung vorhanden ist, nutzen wir MultiCell für die konfigurierte Ausrichtung
+	if !hasFormatting {
+		align := g.getAlign(g.cfg.Layout.Body)
+		// Wir verwenden echten Blocksatz für Paragraphen, wenn "justify" eingestellt ist
+		g.pdf.MultiCell(0, lineHeight, g.prepareText(fullText), "", align, false)
+		g.pdf.Ln(2)
+		return
+	}
 
 	g.fixSegmentSpacing(p.Content)
 	for _, seg := range p.Content {
@@ -817,73 +835,95 @@ func (g *Generator) renderListWithIndent(l blocks.ListBlock, indentLevel int) {
 		if l.Ordered {
 			prefix = fmt.Sprintf("%d. ", i+1)
 		}
-		g.pdf.SetX(currentIndent)
-		g.pdf.Write(lineHeight, g.prepareText(prefix))
 
+		// Prüfen, ob der Listeneintrag Formatierungen enthält
+		hasFormatting := false
+		fullText := prefix
 		for _, seg := range item.Content {
-			if seg.Code {
-				// Inline-Code mit Hintergrund-Chip rendern
-				fontFamily := "main"
-				if g.cfg.Fonts.Mono != "" {
-					fontFamily = "mono"
-				}
-				codeFontSize := g.cfg.Code.FontSize
-				if codeFontSize <= 0 {
-					codeFontSize = g.cfg.FontSize * 0.9 // 90% der normalen Schriftgröße für bessere Lesbarkeit
-				}
-				g.safeSetFont(fontFamily, "", codeFontSize)
+			if seg.Bold || seg.Italic || seg.Strikethrough || seg.Code || seg.Link != "" {
+				hasFormatting = true
+			}
+			fullText += seg.Text
+		}
 
-				if seg.Text != "" {
-					textWidth := g.pdf.GetStringWidth(g.prepareText(seg.Text))
-					chipPaddingH := 2.5              // Horizontales Padding (links und rechts)
-					chipPaddingV := 1.2              // Vertikales Padding (oben und unten)
-					chipHeight := codeFontSize * 0.5 // Höhe basierend auf Schriftgröße
+		if !hasFormatting {
+			align := g.getAlign(g.cfg.Layout.Body)
+			g.pdf.SetX(currentIndent)
+			// Wir berechnen die Breite für MultiCell unter Berücksichtigung der Einrückung
+			w, _ := g.pdf.GetPageSize()
+			_, _, right, _ := g.pdf.GetMargins()
+			width := w - currentIndent - right
+			g.pdf.MultiCell(width, lineHeight, g.prepareText(fullText), "", align, false)
+			g.pdf.Ln(1)
+		} else {
+			g.pdf.SetX(currentIndent)
+			g.pdf.Write(lineHeight, g.prepareText(prefix))
 
+			for _, seg := range item.Content {
+				if seg.Code {
+					// Inline-Code mit Hintergrund-Chip rendern
+					fontFamily := "main"
+					if g.cfg.Fonts.Mono != "" {
+						fontFamily = "mono"
+					}
+					codeFontSize := g.cfg.Code.FontSize
+					if codeFontSize <= 0 {
+						codeFontSize = g.cfg.FontSize * 0.9 // 90% der normalen Schriftgröße für bessere Lesbarkeit
+					}
+					g.safeSetFont(fontFamily, "", codeFontSize)
+
+					if seg.Text != "" {
+						textWidth := g.pdf.GetStringWidth(g.prepareText(seg.Text))
+						chipPaddingH := 2.5              // Horizontales Padding (links und rechts)
+						chipPaddingV := 1.2              // Vertikales Padding (oben und unten)
+						chipHeight := codeFontSize * 0.5 // Höhe basierend auf Schriftgröße
+
+						startX := g.pdf.GetX()
+						startY := g.pdf.GetY()
+
+						// Moderner Hintergrund-Chip (sanftes Grau, ohne sichtbaren Rahmen)
+						g.pdf.SetFillColor(243, 244, 246)                          // Sanftes Grau (wie Tailwind gray-100)
+						chipY := startY + (lineHeight-chipHeight-2*chipPaddingV)/2 // Vertikal zentrieren
+						g.pdf.RoundedRect(startX, chipY, textWidth+2*chipPaddingH, chipHeight+2*chipPaddingV, 1.5, "1234", "F")
+
+						g.pdf.SetX(startX + chipPaddingH)
+						g.pdf.SetTextColor(55, 65, 81) // Dunkles Grau für Code-Text (wie Tailwind gray-700)
+						codeLineHeight := codeFontSize * 0.5
+						g.safeWriteWithFontSize(codeLineHeight, seg.Text, fontFamily, "", seg.Link, codeFontSize)
+
+						g.pdf.SetX(startX + textWidth + 2*chipPaddingH + 1.5)
+
+						// Textfarbe zurücksetzen für nachfolgenden Text
+						g.setPrimaryTextColor()
+					}
+				} else {
+					style := ""
+					if seg.Bold {
+						style += "B"
+					}
+					if seg.Italic {
+						style += "I"
+					}
+					g.safeSetFont("main", style, g.cfg.FontSize)
+
+					// Strikethrough: Position vor dem Text merken
 					startX := g.pdf.GetX()
 					startY := g.pdf.GetY()
 
-					// Moderner Hintergrund-Chip (sanftes Grau, ohne sichtbaren Rahmen)
-					g.pdf.SetFillColor(243, 244, 246)                          // Sanftes Grau (wie Tailwind gray-100)
-					chipY := startY + (lineHeight-chipHeight-2*chipPaddingV)/2 // Vertikal zentrieren
-					g.pdf.RoundedRect(startX, chipY, textWidth+2*chipPaddingH, chipHeight+2*chipPaddingV, 1.5, "1234", "F")
+					g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
 
-					g.pdf.SetX(startX + chipPaddingH)
-					g.pdf.SetTextColor(55, 65, 81) // Dunkles Grau für Code-Text (wie Tailwind gray-700)
-					codeLineHeight := codeFontSize * 0.5
-					g.safeWriteWithFontSize(codeLineHeight, seg.Text, fontFamily, "", seg.Link, codeFontSize)
-
-					g.pdf.SetX(startX + textWidth + 2*chipPaddingH + 1.5)
-
-					// Textfarbe zurücksetzen für nachfolgenden Text
-					g.setPrimaryTextColor()
-				}
-			} else {
-				style := ""
-				if seg.Bold {
-					style += "B"
-				}
-				if seg.Italic {
-					style += "I"
-				}
-				g.safeSetFont("main", style, g.cfg.FontSize)
-
-				// Strikethrough: Position vor dem Text merken
-				startX := g.pdf.GetX()
-				startY := g.pdf.GetY()
-
-				g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
-
-				// Strikethrough-Linie zeichnen
-				if seg.Strikethrough {
-					endX := g.pdf.GetX()
-					strikeY := startY + g.cfg.FontSize*0.35
-					g.pdf.SetDrawColor(0, 0, 0)
-					g.pdf.SetLineWidth(0.3)
-					g.pdf.Line(startX, strikeY, endX, strikeY)
+					// Strikethrough-Linie zeichnen
+					if seg.Strikethrough {
+						endX := g.pdf.GetX()
+						strikeY := startY + g.cfg.FontSize*0.35
+						g.pdf.SetDrawColor(0, 0, 0)
+						g.pdf.SetLineWidth(0.3)
+						g.pdf.Line(startX, strikeY, endX, strikeY)
+					}
 				}
 			}
+			g.pdf.Ln(lineHeight + 2)
 		}
-		g.pdf.Ln(lineHeight + 2)
 
 		// Verschachtelte Liste rendern
 		if item.SubList != nil {
@@ -916,18 +956,13 @@ func (g *Generator) renderBlockquote(b blocks.BlockquoteBlock) {
 			g.setPrimaryTextColor()
 			lineHeight := g.getLineHeight()
 
-			g.fixSegmentSpacing(content.Content)
+			fullText := ""
 			for _, seg := range content.Content {
-				style := "I" // Basis-Style ist kursiv
-				if seg.Bold {
-					style = "BI"
-				}
-				g.safeSetFont("main", style, g.cfg.FontSize)
-				if seg.Text != "" {
-					g.safeWrite(lineHeight, seg.Text, "main", style, seg.Link)
-				}
+				fullText += seg.Text
 			}
-			g.pdf.Ln(lineHeight + 2)
+			align := g.getAlign(g.cfg.Layout.Body)
+			g.pdf.MultiCell(0, lineHeight, g.prepareText(fullText), "", align, false)
+			g.pdf.Ln(2)
 		case blocks.ListBlock:
 			g.renderList(content)
 		}
@@ -947,7 +982,6 @@ func (g *Generator) renderBlockquote(b blocks.BlockquoteBlock) {
 
 // renderTable rendert eine Tabelle mit Kopfzeile und automatischer Spaltenbreite.
 // Verbesserte Darstellung mit schöneren Rahmen, Padding und Zebra-Streifen.
-// Tabellen werden nie auf zwei Seiten aufgeteilt - sie werden komplett auf einer Seite gerendert.
 func (g *Generator) renderTable(t blocks.TableBlock) {
 	if len(t.Rows) == 0 {
 		return
@@ -956,40 +990,133 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 	left, _, right, _ := g.pdf.GetMargins()
 	w, pageHeight := g.pdf.GetPageSize()
 	width := w - left - right
-	colCount := len(t.Rows[0])
+	colCount := 0
+	for _, row := range t.Rows {
+		if len(row) > colCount {
+			colCount = len(row)
+		}
+	}
 	if colCount == 0 {
 		return
 	}
-	colWidth := width / float64(colCount)
 
 	// Tabellen-Styling Konstanten
-	cellPadding := 3.0
-	headerBgR, headerBgG, headerBgB := 230, 230, 240 // Leichtes Blau-Grau für Header
-	evenRowR, evenRowG, evenRowB := 250, 250, 252    // Sehr helles Grau für gerade Zeilen
-	oddRowR, oddRowG, oddRowB := 255, 255, 255       // Weiß für ungerade Zeilen
-	borderR, borderG, borderB := 200, 200, 210       // Dezente Rahmenfarbe
+	cellPadding := 4.0
+	headerBgR, headerBgG, headerBgB := 52, 73, 94 // Elegantes Dunkelblau für Header (Fallback)
+	if g.cfg.Colors.Accent != "" {
+		headerBgR, headerBgG, headerBgB = hexToRGB(g.cfg.Colors.Accent)
+	}
+	headerTextR, headerTextG, headerTextB := 255, 255, 255 // Weißer Text für Header
+	evenRowR, evenRowG, evenRowB := 245, 247, 250          // Sehr helles Blau-Grau für Zebra
+	oddRowR, oddRowG, oddRowB := 255, 255, 255             // Weiß
+	borderR, borderG, borderB := 200, 200, 210             // Dezenter Rahmen
 
+	// Berechne dynamische Spaltenbreiten
+	colWidths := make([]float64, colCount)
 	g.safeSetFont("main", "B", g.cfg.FontSize)
+
+	// 1. Berechne benötigte Breite für jede Spalte
+	for _, row := range t.Rows {
+		for i, cell := range row {
+			if i >= colCount {
+				break
+			}
+			cellText := ""
+			for _, seg := range cell.Content {
+				cellText += seg.Text
+			}
+			// Breite des Textes in einer Zeile messen
+			textWidth := g.pdf.GetStringWidth(cellText) + 2*cellPadding + 4
+			if textWidth > colWidths[i] {
+				colWidths[i] = textWidth
+			}
+		}
+	}
+
+	// 2. Proportionale Anpassung an die Gesamtbreite
+	totalNeededWidth := 0.0
+	for _, cw := range colWidths {
+		totalNeededWidth += cw
+	}
+
+	// Tabellen sollten immer die volle Breite nutzen, wenn sie nicht winzig sind.
+	// Das sorgt für ein konsistentes Look & Feel.
+	if totalNeededWidth > 0 {
+		scaleFactor := width / totalNeededWidth
+		// Wenn die Tabelle natürlich sehr schmal wäre, skalieren wir sie nur moderat,
+		// es sei denn, der User möchte volle Breite (was bei Markdown-Tabellen meist erwartet wird).
+		if totalNeededWidth < width*0.5 {
+			// Begrenze das "Aufblasen" auf maximal 1.5x der natürlichen Breite,
+			// damit schmale Tabellen nicht absurd breit werden.
+			if scaleFactor > 1.5 {
+				scaleFactor = 1.5
+			}
+		}
+
+		for i := range colWidths {
+			colWidths[i] *= scaleFactor
+		}
+	}
+
+	// Sicherstellen, dass die Gesamtbreite nicht das Limit überschreitet
+	currentTotal := 0.0
+	for _, cw := range colWidths {
+		currentTotal += cw
+	}
+	if currentTotal > width {
+		shrink := width / currentTotal
+		for i := range colWidths {
+			colWidths[i] *= shrink
+		}
+	}
+
+	// Falls nach dem Shrinken immer noch winzige Rundungsdifferenzen bestehen,
+	// passen wir die letzte Spalte an.
+	currentTotal = 0.0
+	for _, cw := range colWidths {
+		currentTotal += cw
+	}
+	if len(colWidths) > 0 && currentTotal < width-0.1 {
+		colWidths[len(colWidths)-1] += (width - currentTotal)
+	}
+
 	g.setPrimaryTextColor()
 
-	// Berechne die Gesamthöhe der Tabelle vorab
-	totalTableHeight := 0.0
+	// Berechne die Zeilenhöhen basierend auf den neuen Spaltenbreiten
 	rowHeights := make([]float64, len(t.Rows))
+	totalTableHeight := 0.0
+	lineHeightFactor := 1.2 // Faktor für Zeilenabstand innerhalb der Zelle
 	for rowIdx, row := range t.Rows {
 		maxH := 0.0
-		for _, cell := range row {
+		for i, cell := range row {
+			if i >= colCount {
+				break
+			}
 			g.fixSegmentSpacing(cell.Content)
 			cellText := ""
 			for _, seg := range cell.Content {
 				cellText += seg.Text
 			}
-			lines := g.pdf.SplitLines([]byte(cellText), colWidth-2*cellPadding)
-			h := float64(len(lines)) * (g.cfg.FontSize * 0.5)
+
+			// Font für Messung setzen (Header ist Fett)
+			if cell.Header {
+				g.safeSetFont("main", "B", g.cfg.FontSize)
+			} else {
+				g.safeSetFont("main", "", g.cfg.FontSize)
+			}
+
+			lines := g.pdf.SplitLines([]byte(g.prepareText(cellText)), colWidths[i]-2*cellPadding)
+			h := float64(len(lines)) * (g.cfg.FontSize * 0.35 * lineHeightFactor)
 			if h > maxH {
 				maxH = h
 			}
 		}
 		maxH += 2 * cellPadding // Padding oben und unten
+		// Mindesthöhe für eine Zeile
+		minH := g.cfg.FontSize*0.35*lineHeightFactor + 2*cellPadding
+		if maxH < minH {
+			maxH = minH
+		}
 		rowHeights[rowIdx] = maxH
 		totalTableHeight += maxH
 	}
@@ -997,69 +1124,134 @@ func (g *Generator) renderTable(t blocks.TableBlock) {
 
 	// Berechne verfügbare Höhe auf der aktuellen Seite
 	_, top, _, bottom := g.pdf.GetMargins()
-	availableHeight := pageHeight - g.pdf.GetY() - bottom - 10 // 10 für Sicherheitspuffer
+	availableHeight := pageHeight - g.pdf.GetY() - bottom - 10
 
-	// Prüfe ob die gesamte Tabelle auf die aktuelle Seite passt
-	// Wenn nicht und die Tabelle auf eine neue Seite passen würde, füge Seitenumbruch ein
-	maxPageHeight := pageHeight - top - bottom - 20 // Maximale Höhe auf einer leeren Seite
+	// Seitenumbruch-Logik
+	maxPageHeight := pageHeight - top - bottom - 20
 	if totalTableHeight > availableHeight && totalTableHeight <= maxPageHeight {
-		// Tabelle passt nicht auf aktuelle Seite, aber auf eine neue Seite
 		g.pdf.AddPage()
 	}
-	// Wenn die Tabelle größer als eine Seite ist, wird sie trotzdem gerendert (Fallback)
 
 	rowIndex := 0
+	headerRow := -1
+	for i, row := range t.Rows {
+		if len(row) > 0 && row[0].Header {
+			headerRow = i
+			break
+		}
+	}
+
 	for rowIdx, row := range t.Rows {
 		maxH := rowHeights[rowIdx]
-
 		isHeader := len(row) > 0 && row[0].Header
 
-		for i, cell := range row {
-			x, y := g.pdf.GetX(), g.pdf.GetY()
-			if i == 0 {
-				g.pdf.SetX(left)
-				x = left
+		// Prüfe auf Seitenumbruch innerhalb der Tabelle
+		// Wir lassen etwas Puffer (10mm statt 5mm) am Seitenende für Stabilität
+		if g.pdf.GetY()+maxH > pageHeight-bottom-10 {
+			g.pdf.AddPage()
+			// Wenn wir eine neue Seite anfangen, wiederholen wir den Header
+			if headerRow != -1 && !isHeader {
+				g.renderTableRow(t.Rows[headerRow], colWidths, rowHeights[headerRow], true, rowIndex, headerBgR, headerBgG, headerBgB, headerTextR, headerTextG, headerTextB, evenRowR, evenRowG, evenRowB, oddRowR, oddRowG, oddRowB, borderR, borderG, borderB, t.Alignments, cellPadding)
 			}
-
-			// Hintergrundfarbe setzen
-			if cell.Header || isHeader {
-				g.pdf.SetFillColor(headerBgR, headerBgG, headerBgB)
-				g.safeSetFont("main", "B", g.cfg.FontSize)
-			} else {
-				// Zebra-Streifen für bessere Lesbarkeit
-				if rowIndex%2 == 0 {
-					g.pdf.SetFillColor(evenRowR, evenRowG, evenRowB)
-				} else {
-					g.pdf.SetFillColor(oddRowR, oddRowG, oddRowB)
-				}
-				g.safeSetFont("main", "", g.cfg.FontSize)
-			}
-
-			// Zelle mit Hintergrund zeichnen
-			g.pdf.Rect(x, y, colWidth, maxH, "F")
-
-			// Rahmen zeichnen
-			g.pdf.SetDrawColor(borderR, borderG, borderB)
-			g.pdf.SetLineWidth(0.3)
-			g.pdf.Rect(x, y, colWidth, maxH, "D")
-
-			// Text mit Padding rendern
-			cellText := ""
-			for _, seg := range cell.Content {
-				cellText += seg.Text
-			}
-
-			g.setPrimaryTextColor()
-			g.pdf.SetXY(x+cellPadding, y+cellPadding)
-			g.pdf.MultiCell(colWidth-2*cellPadding, g.cfg.FontSize*0.5, g.prepareText(cellText), "", "L", false)
-			g.pdf.SetXY(x+colWidth, y)
 		}
-		g.pdf.Ln(maxH)
 
-		// Nur nicht-Header Zeilen für Zebra-Streifen zählen
+		g.renderTableRow(row, colWidths, maxH, isHeader, rowIndex, headerBgR, headerBgG, headerBgB, headerTextR, headerTextG, headerTextB, evenRowR, evenRowG, evenRowB, oddRowR, oddRowG, oddRowB, borderR, borderG, borderB, t.Alignments, cellPadding)
+
 		if !isHeader {
 			rowIndex++
 		}
 	}
 	g.pdf.Ln(5)
+}
+
+// renderTableRow rendert eine einzelne Tabellenzeile (Hilfsfunktion für renderTable)
+func (g *Generator) renderTableRow(row []blocks.TableRow, colWidths []float64, maxH float64, isHeader bool, rowIndex int, hBgR, hBgG, hBgB, hTextR, hTextG, hTextB, eRowR, eRowG, eRowB, oRowR, oRowG, oRowB, bR, bG, bB int, alignments []blocks.Align, cellPadding float64) {
+	left, _, _, _ := g.pdf.GetMargins()
+	startY := g.pdf.GetY()
+	colCount := len(colWidths)
+
+	// Zeichne zuerst die Hintergründe und Rahmen für alle Zellen der Zeile
+	currentX := left
+	for i := range colWidths {
+		if i >= len(row) && !isHeader { // Falls die Zeile weniger Zellen hat als Spalten (sollte nicht sein)
+			break
+		}
+
+		g.pdf.SetXY(currentX, startY)
+
+		// Hintergrundfarbe setzen
+		if isHeader {
+			g.pdf.SetFillColor(hBgR, hBgG, hBgB)
+		} else {
+			if rowIndex%2 == 0 {
+				g.pdf.SetFillColor(eRowR, eRowG, eRowB)
+			} else {
+				g.pdf.SetFillColor(oRowR, oRowG, oRowB)
+			}
+		}
+
+		// Zelle mit Hintergrund zeichnen
+		g.pdf.Rect(currentX, startY, colWidths[i], maxH, "F")
+
+		// Rahmen zeichnen
+		g.pdf.SetDrawColor(bR, bG, bB)
+		g.pdf.SetLineWidth(0.15)
+		g.pdf.Rect(currentX, startY, colWidths[i], maxH, "D")
+
+		currentX += colWidths[i]
+	}
+
+	// Dann den Text in die Zellen rendern
+	currentX = left
+	for i, cell := range row {
+		if i >= colCount {
+			break
+		}
+
+		// Textfarbe und Font setzen
+		if cell.Header || isHeader {
+			g.pdf.SetTextColor(hTextR, hTextG, hTextB)
+			g.safeSetFont("main", "B", g.cfg.FontSize)
+		} else {
+			g.setPrimaryTextColor()
+			g.safeSetFont("main", "", g.cfg.FontSize)
+		}
+
+		cellText := ""
+		for _, seg := range cell.Content {
+			cellText += seg.Text
+		}
+
+		align := g.getAlign(g.cfg.Layout.Body)
+		if i < len(alignments) {
+			switch alignments[i] {
+			case blocks.AlignCenter:
+				align = "C"
+			case blocks.AlignRight:
+				align = "R"
+			case blocks.AlignLeft:
+				align = "L"
+			}
+		}
+
+		// Vertikales Zentrieren
+		lines := g.pdf.SplitLines([]byte(g.prepareText(cellText)), colWidths[i]-2*cellPadding)
+		lineHeight := g.cfg.FontSize * 0.35 * 1.2
+		textHeight := float64(len(lines)) * lineHeight
+		verticalOffset := (maxH - textHeight) / 2
+		if verticalOffset < cellPadding {
+			verticalOffset = cellPadding
+		}
+
+		g.pdf.SetXY(currentX+cellPadding, startY+verticalOffset)
+
+		// Wenn align "J" (Justify) ist, müssen wir sicherstellen, dass MultiCell
+		// die Breite der Zelle abzüglich Padding nutzt.
+		g.pdf.MultiCell(colWidths[i]-2*cellPadding, lineHeight, g.prepareText(cellText), "", align, false)
+
+		currentX += colWidths[i]
+	}
+
+	// Nach der Zeile setzen wir den Y-Cursor absolut auf das Ende der Zeile
+	g.pdf.SetXY(left, startY+maxH)
 }
